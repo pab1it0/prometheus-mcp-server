@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/pab1it0-prometheus-mcp-server-badge.png)](https://mseep.ai/app/pab1it0-prometheus-mcp-server)
+
 # Prometheus MCP Server
 
 A [Model Context Protocol][mcp] (MCP) server for Prometheus.
