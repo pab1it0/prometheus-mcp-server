@@ -22,7 +22,6 @@ This provides access to your Prometheus metrics and queries through standardized
   - [x] Basic auth from environment variables
   - [x] Bearer token auth from environment variables
 - [x] Docker containerization support
-
 - [x] Provide interactive tools for AI assistants
 
 The list of tools is configurable, so you can choose which tools you want to make available to the MCP client.
@@ -30,9 +29,64 @@ This is useful if you don't use certain functionality or if you don't want to ta
 
 ## Usage
 
-1. Ensure your Prometheus server is accessible from the environment where you'll run this MCP server.
+### Docker (Recommended)
 
-2. Configure the environment variables for your Prometheus server, either through a `.env` file or system environment variables:
+The easiest way to run prometheus-mcp-server with [Claude Desktop](https://claude.ai/desktop) is using Docker. If you don't have Docker installed, you can get it from [Docker's official website](https://www.docker.com/get-started/).
+
+Edit your Claude Desktop config file:
+* Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
+* Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+* Linux: `~/.config/Claude/claude_desktop_config.json`
+
+Then add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "prometheus": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-e", "PROMETHEUS_URL",
+        "-e", "PROMETHEUS_USERNAME",
+        "-e", "PROMETHEUS_PASSWORD",
+        "-e", "PROMETHEUS_TOKEN",
+        "pab1it0/prometheus-mcp-server"
+      ]
+    }
+  }
+}
+```
+
+### Running with UV
+
+Alternatively, you can run the server directly using UV. Edit your Claude Desktop config file (locations listed above) and add the server configuration:
+
+```json
+{
+  "mcpServers": {
+    "prometheus": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "<full path to prometheus-mcp-server directory>",
+        "run",
+        "src/prometheus_mcp_server/main.py"
+      ]
+    }
+  }
+}
+```
+
+> Note: if you see `Error: spawn uv ENOENT` in [Claude Desktop](https://claude.ai/desktop), you may need to specify the full path to `uv` or set the environment variable `NO_UV=1` in the configuration.
+
+## Configuration
+
+Ensure your Prometheus server is accessible from the environment where you'll run this MCP server.
+
+Configure the environment variables for your Prometheus server, either through your MCP client configuration or system environment variables:
 
 ```env
 # Required: Prometheus configuration
@@ -51,97 +105,6 @@ PROMETHEUS_TOKEN=your_token
 # Optional: For multi-tenant setups like Cortex, Mimir or Thanos
 ORG_ID=your_organization_id
 ```
-
-3. Add the server configuration to your client configuration file. For example, for Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "prometheus": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "<full path to prometheus-mcp-server directory>",
-        "run",
-        "src/prometheus_mcp_server/main.py"
-      ],
-      "env": {
-        "PROMETHEUS_URL": "http://your-prometheus-server:9090",
-        "PROMETHEUS_USERNAME": "your_username",
-        "PROMETHEUS_PASSWORD": "your_password"
-      }
-    }
-  }
-}
-```
-
-> Note: if you see `Error: spawn uv ENOENT` in Claude Desktop, you may need to specify the full path to `uv` or set the environment variable `NO_UV=1` in the configuration.
-
-## Docker Usage
-
-This project includes Docker support for easy deployment and isolation.
-
-### Building the Docker Image
-
-Build the Docker image using:
-
-```bash
-docker build -t prometheus-mcp-server .
-```
-
-### Running with Docker
-
-You can run the server using Docker in several ways:
-
-#### Using docker run directly:
-
-```bash
-docker run -it --rm \
-  -e PROMETHEUS_URL=http://your-prometheus-server:9090 \
-  -e PROMETHEUS_USERNAME=your_username \
-  -e PROMETHEUS_PASSWORD=your_password \
-  prometheus-mcp-server
-```
-
-#### Using docker-compose:
-
-Create a `.env` file with your Prometheus credentials and then run:
-
-```bash
-docker-compose up
-```
-
-### Running with Docker in Claude Desktop
-
-To use the containerized server with Claude Desktop, update the configuration to use Docker with the environment variables:
-
-```json
-{
-  "mcpServers": {
-    "prometheus": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "-e", "PROMETHEUS_URL",
-        "-e", "PROMETHEUS_USERNAME",
-        "-e", "PROMETHEUS_PASSWORD",
-        "prometheus-mcp-server"
-      ],
-      "env": {
-        "PROMETHEUS_URL": "http://your-prometheus-server:9090",
-        "PROMETHEUS_USERNAME": "your_username",
-        "PROMETHEUS_PASSWORD": "your_password"
-      }
-    }
-  }
-}
-```
-
-This configuration passes the environment variables from Claude Desktop to the Docker container by using the `-e` flag with just the variable name, and providing the actual values in the `env` object.
-
-> **Note about Docker implementation**: The Docker setup has been updated to match the structure of the chess-mcp project, which has been proven to work correctly with Claude. The new implementation uses a multi-stage build process and runs the entry point script directly without an intermediary shell script. This approach ensures proper handling of stdin/stdout for MCP communication.
 
 ## Development
 
@@ -162,27 +125,9 @@ source .venv/bin/activate  # On Unix/macOS
 uv pip install -e .
 ```
 
-## Project Structure
-
-The project has been organized with a `src` directory structure:
-
-```
-prometheus-mcp-server/
-├── src/
-│   └── prometheus_mcp_server/
-│       ├── __init__.py      # Package initialization
-│       ├── server.py        # MCP server implementation
-│       ├── main.py          # Main application logic
-├── Dockerfile               # Docker configuration
-├── docker-compose.yml       # Docker Compose configuration
-├── .dockerignore            # Docker ignore file
-├── pyproject.toml           # Project configuration
-└── README.md                # This file
-```
-
 ### Testing
 
-The project includes a comprehensive test suite that ensures functionality and helps prevent regressions.
+The project includes a test suite that ensures functionality and helps prevent regressions.
 
 Run the tests with pytest:
 
@@ -196,24 +141,17 @@ pytest
 # Run with coverage report
 pytest --cov=src --cov-report=term-missing
 ```
-Tests are organized into:
 
-- Configuration validation tests
-- Server functionality tests
-- Error handling tests
-- Main application tests
+## Available Tools
 
-When adding new features, please also add corresponding tests.
+### Query
+- `execute_query` - Execute a PromQL instant query against Prometheus
+- `execute_range_query` - Execute a PromQL range query with start time, end time, and step interval
 
-### Tools
-
-| Tool | Category | Description |
-| --- | --- | --- |
-| `execute_query` | Query | Execute a PromQL instant query against Prometheus |
-| `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
-| `list_metrics` | Discovery | List all available metrics in Prometheus |
-| `get_metric_metadata` | Discovery | Get metadata for a specific metric |
-| `get_targets` | Discovery | Get information about all scrape targets |
+### Discovery
+- `list_metrics` - List all available metrics in Prometheus
+- `get_metric_metadata` - Get metadata for a specific metric
+- `get_targets` - Get information about all scrape targets
 
 ## License
 

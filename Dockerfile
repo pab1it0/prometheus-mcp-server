@@ -29,14 +29,13 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH="/app" \
-    PYTHONFAULTHANDLER=1
+    PYTHONFAULTHANDLER=1 \
+    PROMETHEUS_URL=${PROMETHEUS_URL} \
+    PROMETHEUS_USERNAME=${PROMETHEUS_USERNAME} \
+    PROMETHEUS_PASSWORD=${PROMETHEUS_PASSWORD} \
+    PROMETHEUS_TOKEN=${PROMETHEUS_TOKEN}
 
 USER app
-
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["/app/.venv/bin/prometheus-mcp-server"]
 
