@@ -5,56 +5,53 @@ import pytest
 from unittest.mock import patch, MagicMock
 from prometheus_mcp_server.main import setup_environment, run_server
 
-def test_setup_environment_success():
+@patch("prometheus_mcp_server.main.config")
+def test_setup_environment_success(mock_config):
     """Test successful environment setup."""
     # Setup
-    os.environ["PROMETHEUS_URL"] = "http://test:9090"
+    mock_config.url = "http://test:9090"
+    mock_config.username = None
+    mock_config.password = None
+    mock_config.token = None
+    mock_config.org_id = None
 
-    # Execute with mocked print function
-    with patch("builtins.print") as mock_print:
-        result = setup_environment()
+    # Execute
+    result = setup_environment()
 
     # Verify
     assert result is True
-    mock_print.assert_any_call("Prometheus configuration:")
-    mock_print.assert_any_call("  Server URL: http://test:9090")
 
-    # Clean up
-    del os.environ["PROMETHEUS_URL"]
-
-def test_setup_environment_missing_url():
+@patch("prometheus_mcp_server.main.config")
+def test_setup_environment_missing_url(mock_config):
     """Test environment setup with missing URL."""
-    # Setup - ensure URL is not in environment
-    if "PROMETHEUS_URL" in os.environ:
-        del os.environ["PROMETHEUS_URL"]
+    # Setup - mock config with no URL
+    mock_config.url = ""
+    mock_config.username = None
+    mock_config.password = None
+    mock_config.token = None
+    mock_config.org_id = None
 
-    # Execute with mocked print function
-    with patch("builtins.print") as mock_print:
-        result = setup_environment()
+    # Execute
+    result = setup_environment()
 
     # Verify
     assert result is False
-    mock_print.assert_any_call("ERROR: PROMETHEUS_URL environment variable is not set")
 
-def test_setup_environment_with_auth():
+@patch("prometheus_mcp_server.main.config")
+def test_setup_environment_with_auth(mock_config):
     """Test environment setup with authentication."""
     # Setup
-    os.environ["PROMETHEUS_URL"] = "http://test:9090"
-    os.environ["PROMETHEUS_USERNAME"] = "user"
-    os.environ["PROMETHEUS_PASSWORD"] = "pass"
+    mock_config.url = "http://test:9090"
+    mock_config.username = "user"
+    mock_config.password = "pass"
+    mock_config.token = None
+    mock_config.org_id = None
 
-    # Execute with mocked print function
-    with patch("builtins.print") as mock_print:
-        result = setup_environment()
+    # Execute
+    result = setup_environment()
 
     # Verify
     assert result is True
-    mock_print.assert_any_call("Authentication: Using basic auth")
-
-    # Clean up
-    del os.environ["PROMETHEUS_URL"]
-    del os.environ["PROMETHEUS_USERNAME"]
-    del os.environ["PROMETHEUS_PASSWORD"]
 
 @patch("prometheus_mcp_server.main.setup_environment")
 @patch("prometheus_mcp_server.main.mcp.run")
@@ -79,9 +76,12 @@ def test_run_server_setup_failure(mock_exit, mock_run, mock_setup):
     """Test server run with setup failure."""
     # Setup
     mock_setup.return_value = False
+    # Make sys.exit actually stop execution
+    mock_exit.side_effect = SystemExit(1)
 
-    # Execute
-    run_server()
+    # Execute - should raise SystemExit
+    with pytest.raises(SystemExit):
+        run_server()
 
     # Verify
     mock_setup.assert_called_once()

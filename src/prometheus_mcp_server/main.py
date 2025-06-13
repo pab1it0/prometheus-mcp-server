@@ -2,28 +2,39 @@
 import sys
 import dotenv
 from prometheus_mcp_server.server import mcp, config
+from prometheus_mcp_server.logging_config import setup_logging, get_logger
+
+# Initialize structured logging
+logger = setup_logging()
 
 def setup_environment():
     if dotenv.load_dotenv():
-        print("Loaded environment variables from .env file")
+        logger.info("Environment configuration loaded", source=".env file")
     else:
-        print("No .env file found or could not load it - using environment variables")
+        logger.info("Environment configuration loaded", source="environment variables", note="No .env file found")
 
     if not config.url:
-        print("ERROR: PROMETHEUS_URL environment variable is not set")
-        print("Please set it to your Prometheus server URL")
-        print("Example: http://your-prometheus-server:9090")
+        logger.error(
+            "Missing required configuration",
+            error="PROMETHEUS_URL environment variable is not set",
+            suggestion="Please set it to your Prometheus server URL",
+            example="http://your-prometheus-server:9090"
+        )
         return False
     
-    print(f"Prometheus configuration:")
-    print(f"  Server URL: {config.url}")
-    
+    # Determine authentication method
+    auth_method = "none"
     if config.username and config.password:
-        print("Authentication: Using basic auth")
+        auth_method = "basic_auth"
     elif config.token:
-        print("Authentication: Using bearer token")
-    else:
-        print("Authentication: None (no credentials provided)")
+        auth_method = "bearer_token"
+    
+    logger.info(
+        "Prometheus configuration validated",
+        server_url=config.url,
+        authentication=auth_method,
+        org_id=config.org_id if config.org_id else None
+    )
     
     return True
 
@@ -31,10 +42,10 @@ def run_server():
     """Main entry point for the Prometheus MCP Server"""
     # Setup environment
     if not setup_environment():
+        logger.error("Environment setup failed, exiting")
         sys.exit(1)
     
-    print("\nStarting Prometheus MCP Server...")
-    print("Running server in standard mode...")
+    logger.info("Starting Prometheus MCP Server", transport="stdio")
     
     # Run the server with the stdio transport
     mcp.run(transport="stdio")

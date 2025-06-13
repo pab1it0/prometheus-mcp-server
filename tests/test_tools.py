@@ -81,7 +81,7 @@ async def test_execute_range_query(mock_make_request):
 async def test_list_metrics(mock_make_request):
     """Test the list_metrics tool."""
     # Setup
-    mock_make_request.return_value = {"values": ["up", "go_goroutines", "http_requests_total"]}
+    mock_make_request.return_value = ["up", "go_goroutines", "http_requests_total"]
 
     # Execute
     result = await list_metrics()

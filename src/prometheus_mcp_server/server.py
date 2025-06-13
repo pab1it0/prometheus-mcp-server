@@ -10,9 +10,13 @@ from datetime import datetime, timedelta
 import dotenv
 import requests
 from mcp.server.fastmcp import FastMCP
+from prometheus_mcp_server.logging_config import get_logger
 
 dotenv.load_dotenv()
 mcp = FastMCP("Prometheus MCP")
+
+# Get logger instance
+logger = get_logger()
 
 @dataclass
 class PrometheusConfig:
@@ -43,6 +47,7 @@ def get_prometheus_auth():
 def make_prometheus_request(endpoint, params=None):
     """Make a request to the Prometheus API with proper authentication and headers."""
     if not config.url:
+        logger.error("Prometheus configuration missing", error="PROMETHEUS_URL not set")
         raise ValueError("Prometheus configuration is missing. Please set PROMETHEUS_URL environment variable.")
 
     url = f"{config.url.rstrip('/')}/api/v1/{endpoint}"
@@ -57,16 +62,32 @@ def make_prometheus_request(endpoint, params=None):
     if config.org_id:
         headers["X-Scope-OrgID"] = config.org_id
 
-    # Make the request with appropriate headers and auth
-    response = requests.get(url, params=params, auth=auth, headers=headers)
+    try:
+        logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params)
+        
+        # Make the request with appropriate headers and auth
+        response = requests.get(url, params=params, auth=auth, headers=headers)
+        
+        response.raise_for_status()
+        result = response.json()
+        
+        if result["status"] != "success":
+            error_msg = result.get('error', 'Unknown error')
+            logger.error("Prometheus API returned error", endpoint=endpoint, error=error_msg, status=result["status"])
+            raise ValueError(f"Prometheus API error: {error_msg}")
+        
+        logger.debug("Prometheus API request successful", endpoint=endpoint, result_type=result.get("data", {}).get("resultType"))
+        return result["data"]
     
-    response.raise_for_status()
-    result = response.json()
-    
-    if result["status"] != "success":
-        raise ValueError(f"Prometheus API error: {result.get('error', 'Unknown error')}")
-    
-    return result["data"]
+    except requests.exceptions.RequestException as e:
+        logger.error("HTTP request to Prometheus failed", endpoint=endpoint, url=url, error=str(e), error_type=type(e).__name__)
+        raise
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse Prometheus response as JSON", endpoint=endpoint, url=url, error=str(e))
+        raise ValueError(f"Invalid JSON response from Prometheus: {str(e)}")
+    except Exception as e:
+        logger.error("Unexpected error during Prometheus request", endpoint=endpoint, url=url, error=str(e), error_type=type(e).__name__)
+        raise
 
 @mcp.tool(description="Execute a PromQL instant query against Prometheus")
 async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any]:
@@ -83,11 +104,20 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
     if time:
         params["time"] = time
     
+    logger.info("Executing instant query", query=query, time=time)
     data = make_prometheus_request("query", params=params)
-    return {
+    
+    result = {
         "resultType": data["resultType"],
         "result": data["result"]
     }
+    
+    logger.info("Instant query completed", 
+                query=query, 
+                result_type=data["resultType"], 
+                result_count=len(data["result"]) if isinstance(data["result"], list) else 1)
+    
+    return result
 
 @mcp.tool(description="Execute a PromQL range query with start time, end time, and step interval")
 async def execute_range_query(query: str, start: str, end: str, step: str) -> Dict[str, Any]:
@@ -109,11 +139,20 @@ async def execute_range_query(query: str, start: str, end: str, step: str) -> Di
         "step": step
     }
     
+    logger.info("Executing range query", query=query, start=start, end=end, step=step)
     data = make_prometheus_request("query_range", params=params)
-    return {
+    
+    result = {
         "resultType": data["resultType"],
         "result": data["result"]
     }
+    
+    logger.info("Range query completed", 
+                query=query, 
+                result_type=data["resultType"], 
+                result_count=len(data["result"]) if isinstance(data["result"], list) else 1)
+    
+    return result
 
 @mcp.tool(description="List all available metrics in Prometheus")
 async def list_metrics() -> List[str]:
@@ -122,7 +161,9 @@ async def list_metrics() -> List[str]:
     Returns:
         List of metric names as strings
     """
+    logger.info("Listing available metrics")
     data = make_prometheus_request("label/__name__/values")
+    logger.info("Metrics list retrieved", metric_count=len(data))
     return data
 
 @mcp.tool(description="Get metadata for a specific metric")
@@ -135,8 +176,10 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     Returns:
         List of metadata entries for the metric
     """
+    logger.info("Retrieving metric metadata", metric=metric)
     params = {"metric": metric}
     data = make_prometheus_request("metadata", params=params)
+    logger.info("Metric metadata retrieved", metric=metric, metadata_count=len(data["metadata"]))
     return data["metadata"]
 
 @mcp.tool(description="Get information about all scrape targets")
@@ -146,12 +189,20 @@ async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
     Returns:
         Dictionary with active and dropped targets information
     """
+    logger.info("Retrieving scrape targets information")
     data = make_prometheus_request("targets")
-    return {
+    
+    result = {
         "activeTargets": data["activeTargets"],
         "droppedTargets": data["droppedTargets"]
     }
+    
+    logger.info("Scrape targets retrieved", 
+                active_targets=len(data["activeTargets"]), 
+                dropped_targets=len(data["droppedTargets"]))
+    
+    return result
 
 if __name__ == "__main__":
-    print(f"Starting Prometheus MCP Server...")
+    logger.info("Starting Prometheus MCP Server", mode="direct")
     mcp.run()

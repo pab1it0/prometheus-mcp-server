@@ -10,6 +10,7 @@ dependencies = [
     "python-dotenv",
     "pyproject-toml>=0.1.0",
     "requests",
+    "structlog>=23.0.0",
 ]
 
 [project.optional-dependencies]
