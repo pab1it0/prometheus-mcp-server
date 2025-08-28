@@ -48,3 +48,11 @@ htmlcov/
 
 # Claude Code
 CLAUDE.md
+
+# Claude Flow temporary files
+.claude-flow/
+.swarm/
+
+# Security scan results
+trivy*.json
+trivy-*.json
