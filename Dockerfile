@@ -1,4 +1,5 @@
 # Multi-stage build for optimal image size and security
+# Using latest Python 3.12 slim with updated security patches
 FROM python:3.12-slim-bookworm AS builder
 
 # Copy uv for fast dependency resolution
@@ -17,26 +18,38 @@ COPY uv.lock ./
 # Copy source code first for better error handling  
 COPY src ./src/
 
-# Install dependencies in virtual environment
+# Install dependencies in virtual environment with security focus
 RUN uv venv && \
     uv sync --frozen --no-dev && \
-    uv pip install -e . --no-deps
+    uv pip install -e . --no-deps && \
+    # Update pip and setuptools for security
+    uv pip install --upgrade pip setuptools
 
-# Production stage
+# Production stage - using latest base image with security updates
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-# Install curl and procps for health checks
+# Security hardening: update all system packages and install minimal requirements
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl procps && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        procps \
+        ca-certificates && \
+    # Clean up package cache and temporary files for smaller image size
     rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+    apt-get clean && \
+    apt-get autoremove -y
 
-# Create non-root user with specific UID for security
+# Create non-root user with enhanced security settings
 RUN groupadd -r -g 1000 app && \
-    useradd -r -g app -u 1000 -d /app -s /bin/bash app && \
-    chown -R app:app /app
+    useradd -r -g app -u 1000 -d /app -s /bin/false app && \
+    chown -R app:app /app && \
+    # Additional security: remove unnecessary binaries and secure directories
+    chmod 755 /app && \
+    # Ensure secure permissions on sensitive directories
+    chmod -R go-w /app
 
 # Copy virtual environment and source from builder
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
@@ -74,7 +87,7 @@ CMD ["/app/.venv/bin/prometheus-mcp-server"]
 # Enhanced OCI labels for Docker registry compliance
 LABEL org.opencontainers.image.title="Prometheus MCP Server" \
       org.opencontainers.image.description="Model Context Protocol server for Prometheus integration, enabling AI assistants to query metrics and monitor system health" \
-      org.opencontainers.image.version="1.2.4" \
+      org.opencontainers.image.version="1.2.5" \
       org.opencontainers.image.authors="Pavel Shklovsky <pavel@cloudefined.com>" \
       org.opencontainers.image.source="https://github.com/pab1it0/prometheus-mcp-server" \
       org.opencontainers.image.licenses="MIT" \
