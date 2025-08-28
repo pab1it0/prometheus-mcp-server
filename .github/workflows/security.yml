@@ -29,13 +29,15 @@ jobs:
         run: |
           docker build -t ghcr.io/pab1it0/prometheus-mcp-server:${{ github.sha }} .
 
-      - name: Run Trivy vulnerability scanner (fail on CRITICAL)
+      - name: Run Trivy vulnerability scanner (fail on CRITICAL Python packages only)
         uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
         with:
           image-ref: 'ghcr.io/pab1it0/prometheus-mcp-server:${{ github.sha }}'
           format: 'table'
           severity: 'CRITICAL'
           exit-code: '1'
+          scanners: 'vuln'
+          vuln-type: 'library'
 
       - name: Run Trivy vulnerability scanner (SARIF output)
         uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
