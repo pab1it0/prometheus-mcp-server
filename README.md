@@ -42,40 +42,7 @@ This is useful if you don't use certain functionality or if you don't want to ta
 - Docker Desktop (recommended) or Docker CLI
 - MCP-compatible client (Claude Desktop, VS Code, Cursor, Windsurf, etc.)
 
-### Configuration
-
-Create a `.env` file or set environment variables for your Prometheus connection:
-
-```env
-# Required: Your Prometheus server URL
-PROMETHEUS_URL=http://localhost:9090
-
-# Optional: Authentication credentials (choose one method)
-# For Basic Auth (e.g., Grafana Cloud):
-PROMETHEUS_USERNAME=123456
-PROMETHEUS_PASSWORD=glc_eyJvIjoiMTIzNDU2IiwibiI6InN0YWNrLTEyMzQ1Ni1obS1yZWFkLXRva2VuIiwiayI6IjEyMzQ1Njc4OTAifQ==
-
-# For Bearer Token Auth:
-# PROMETHEUS_TOKEN=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-# Optional: For multi-tenant setups (Cortex, Mimir, Thanos)
-# ORG_ID=company-dev
-```
-
 ### Installation Methods
-
-<details>
-<summary><b>Docker Desktop</b></summary>
-
-The easiest way to run the Prometheus MCP server is through Docker Desktop:
-
-1. **Via MCP Catalog**: Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus-mcp-server) and click "Add to Docker Desktop" (when available)
-   
-2. **Via MCP Toolkit**: Use Docker Desktop's MCP Toolkit extension to discover and install the server
-
-3. Configure your connection using the environment variables from the Configuration section above
-
-</details>
 
 <details>
 <summary><b>Claude Desktop</b></summary>
@@ -105,6 +72,27 @@ Add to your Claude Desktop configuration:
 </details>
 
 <details>
+<summary><b>Claude Code (CLI)</b></summary>
+
+Install via the Claude Code CLI:
+
+```bash
+claude code add prometheus-mcp-server
+```
+
+Then configure your Prometheus connection:
+
+```bash
+# Set your Prometheus URL
+claude code config set prometheus-mcp-server PROMETHEUS_URL "http://your-prometheus:9090"
+
+# Optional: Set authentication
+claude code config set prometheus-mcp-server PROMETHEUS_USERNAME "admin"
+claude code config set prometheus-mcp-server PROMETHEUS_PASSWORD "password"
+```
+</details>
+
+<details>
 <summary><b>VS Code / Cursor / Windsurf</b></summary>
 
 Add to your MCP settings in the respective IDE:
@@ -127,6 +115,19 @@ Add to your MCP settings in the respective IDE:
   }
 }
 ```
+</details>
+
+<details>
+<summary><b>Docker Desktop</b></summary>
+
+The easiest way to run the Prometheus MCP server is through Docker Desktop:
+
+1. **Via MCP Catalog**: Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus-mcp-server) and click "Add to Docker Desktop" (when available)
+   
+2. **Via MCP Toolkit**: Use Docker Desktop's MCP Toolkit extension to discover and install the server
+
+3. Configure your connection using environment variables (see Configuration Options below)
+
 </details>
 
 <details>
