@@ -67,23 +67,12 @@ Add to your Claude Desktop configuration:
 </details>
 
 <details>
-<summary><b>Claude Code (CLI)</b></summary>
+<summary><b>Claude Code</b></summary>
 
 Install via the Claude Code CLI:
 
 ```bash
-claude code add prometheus-mcp-server
-```
-
-Then configure your Prometheus connection:
-
-```bash
-# Set your Prometheus URL
-claude code config set prometheus-mcp-server PROMETHEUS_URL "http://your-prometheus:9090"
-
-# Optional: Set authentication
-claude code config set prometheus-mcp-server PROMETHEUS_USERNAME "admin"
-claude code config set prometheus-mcp-server PROMETHEUS_PASSWORD "password"
+claude mcp add prometheus --env PROMETHEUS_URL=http://your-prometheus:9090 -- docker run -i --rm -e PROMETHEUS_URL ghcr.io/pab1it0/prometheus-mcp-server:latest
 ```
 </details>
 
