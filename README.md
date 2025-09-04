@@ -1,12 +1,11 @@
 # Prometheus MCP Server
-
-A [Model Context Protocol][mcp] (MCP) server for Prometheus.
-
 [![GitHub Container Registry](https://img.shields.io/badge/ghcr.io-pab1it0%2Fprometheus--mcp--server-blue?logo=docker)](https://github.com/users/pab1it0/packages/container/package/prometheus-mcp-server)
 [![GitHub Release](https://img.shields.io/github/v/release/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/releases)
 [![Codecov](https://codecov.io/gh/pab1it0/prometheus-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/pab1it0/prometheus-mcp-server)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License](https://img.shields.io/github/license/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/blob/main/LICENSE)
+
+A [Model Context Protocol][mcp] (MCP) server for Prometheus.
 
 This provides access to your Prometheus metrics and queries through standardized MCP interfaces, allowing AI assistants to execute PromQL queries and analyze your metrics data.
 
@@ -122,7 +121,11 @@ Add to your MCP settings in the respective IDE:
 
 The easiest way to run the Prometheus MCP server is through Docker Desktop:
 
-1. **Via MCP Catalog**: Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus-mcp-server) and click "Add to Docker Desktop" (when available)
+<a href="https://hub.docker.com/open-desktop?url=https://open.docker.com/dashboard/mcp/servers/id/prometheus/config?enable=true">
+  <img src="https://img.shields.io/badge/Add%20to-Docker%20Desktop-blue?style=for-the-badge&logo=docker&logoColor=white" alt="Add to Docker Desktop" />
+</a>
+
+1. **Via MCP Catalog**: Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus/overview) and click the button above
    
 2. **Via MCP Toolkit**: Use Docker Desktop's MCP Toolkit extension to discover and install the server
 
