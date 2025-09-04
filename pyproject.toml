@@ -45,6 +45,7 @@ addopts = "--cov=src --cov-report=term-missing"
 [tool.coverage.run]
 source = ["src/prometheus_mcp_server"]
 omit = ["*/__pycache__/*", "*/tests/*", "*/.venv/*", "*/venv/*"]
+branch = true
 
 [tool.coverage.report]
 exclude_lines = [
@@ -56,3 +57,13 @@ exclude_lines = [
     "pass",
     "raise ImportError"
 ]
+precision = 1
+show_missing = true
+skip_covered = false
+fail_under = 90
+
+[tool.coverage.json]
+show_contexts = true
+
+[tool.coverage.xml]
+output = "coverage.xml"
