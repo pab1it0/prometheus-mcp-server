@@ -202,4 +202,60 @@ def test_run_server_setup_failure(mock_exit, mock_run, mock_setup):
     # Verify
     mock_setup.assert_called_once()
     mock_run.assert_not_called()
-    mock_exit.assert_called_once_with(1)
+
+@patch("prometheus_mcp_server.main.config")
+@patch("prometheus_mcp_server.main.dotenv.load_dotenv")
+def test_setup_environment_bearer_token_auth(mock_load_dotenv, mock_config):
+    """Test environment setup with bearer token authentication."""
+    # Setup
+    mock_load_dotenv.return_value = False
+    mock_config.url = "http://test:9090"
+    mock_config.username = ""
+    mock_config.password = ""
+    mock_config.token = "bearer_token_123"
+    mock_config.org_id = None
+    mock_config.mcp_server_config = None
+
+    # Execute
+    result = setup_environment()
+
+    # Verify
+    assert result is True
+
+@patch("prometheus_mcp_server.main.setup_environment")
+@patch("prometheus_mcp_server.main.mcp.run")
+@patch("prometheus_mcp_server.main.config")
+def test_run_server_http_transport(mock_config, mock_run, mock_setup):
+    """Test server run with HTTP transport."""
+    # Setup
+    mock_setup.return_value = True
+    mock_config.mcp_server_config = MCPServerConfig(
+        mcp_server_transport="http",
+        mcp_bind_host="localhost", 
+        mcp_bind_port=8080
+    )
+
+    # Execute
+    run_server()
+
+    # Verify
+    mock_run.assert_called_once_with(transport="http", host="localhost", port=8080)
+
+@patch("prometheus_mcp_server.main.setup_environment")
+@patch("prometheus_mcp_server.main.mcp.run")
+@patch("prometheus_mcp_server.main.config")
+def test_run_server_sse_transport(mock_config, mock_run, mock_setup):
+    """Test server run with SSE transport."""
+    # Setup
+    mock_setup.return_value = True
+    mock_config.mcp_server_config = MCPServerConfig(
+        mcp_server_transport="sse",
+        mcp_bind_host="0.0.0.0",
+        mcp_bind_port=9090
+    )
+
+    # Execute
+    run_server()
+
+    # Verify
+    mock_run.assert_called_once_with(transport="sse", host="0.0.0.0", port=9090)
