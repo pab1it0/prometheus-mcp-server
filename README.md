@@ -2,8 +2,9 @@
 
 A [Model Context Protocol][mcp] (MCP) server for Prometheus.
 
-![Docker](https://img.shields.io/docker/v/pab1it0/prometheus-mcp-server?label=docker&logo=docker)
+![GitHub Container Registry](https://img.shields.io/badge/ghcr.io-pab1it0%2Fprometheus--mcp--server-blue?logo=docker)
 ![GitHub Release](https://img.shields.io/github/v/release/pab1it0/prometheus-mcp-server)
+![Codecov](https://codecov.io/gh/pab1it0/prometheus-mcp-server/branch/main/graph/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/github/license/pab1it0/prometheus-mcp-server)
 
@@ -41,37 +42,80 @@ This is useful if you don't use certain functionality or if you don't want to ta
 - Docker Desktop (recommended) or Docker CLI
 - MCP-compatible client (Claude Desktop, VS Code, Cursor, Windsurf, etc.)
 
-### Docker Desktop Integration
+### Configuration
 
-The easiest way to run the Prometheus MCP server is through Docker Desktop's MCP catalog:
+Create a `.env` file or set environment variables for your Prometheus connection:
 
-1. **Install via Docker Hub MCP Catalog**
-   
-   Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus-mcp-server) and click "Add to Docker Desktop" (when available)
-   
-   Or use Docker Desktop's MCP Toolkit extension to discover and install the server.
+```env
+# Required: Your Prometheus server URL
+PROMETHEUS_URL=http://your-prometheus-server:9090
 
-2. **Configure Your Prometheus Connection**
-   
-   Set these environment variables in your Docker Desktop configuration or `.env` file:
-   
-   ```env
-   # Required: Your Prometheus server URL
-   PROMETHEUS_URL=http://your-prometheus-server:9090
-   
-   # Optional: Authentication (choose one method if needed)
-   # Basic auth:
-   PROMETHEUS_USERNAME=your_username
-   PROMETHEUS_PASSWORD=your_password
-   
-   # Or Bearer token:
-   PROMETHEUS_TOKEN=your_token
-   
-   # Optional: For multi-tenant setups (Cortex, Mimir, Thanos)
-   ORG_ID=your_organization_id
-   ```
+# Optional: Authentication (choose one method if needed)
+# Basic auth:
+PROMETHEUS_USERNAME=your_username
+PROMETHEUS_PASSWORD=your_password
+
+# Or Bearer token:
+PROMETHEUS_TOKEN=your_token
+
+# Optional: For multi-tenant setups (Cortex, Mimir, Thanos)
+ORG_ID=your_organization_id
+```
+
+#### Common Configuration Examples
+
+<details>
+<summary><b>Local Prometheus (no auth)</b></summary>
+
+```env
+PROMETHEUS_URL=http://localhost:9090
+```
+</details>
+
+<details>
+<summary><b>Prometheus with Basic Auth</b></summary>
+
+```env
+PROMETHEUS_URL=https://prometheus.example.com
+PROMETHEUS_USERNAME=admin
+PROMETHEUS_PASSWORD=secretpassword
+```
+</details>
+
+<details>
+<summary><b>Grafana Cloud Prometheus</b></summary>
+
+```env
+PROMETHEUS_URL=https://prometheus-prod-us-central.grafana.net
+PROMETHEUS_USERNAME=123456
+PROMETHEUS_PASSWORD=glc_eyJvIjoiMTIzNDU2IiwibiI6InN0YWNrLTEyMzQ1Ni1obS1yZWFkLXRva2VuIiwiayI6IjEyMzQ1Njc4OTAifQ==
+```
+</details>
+
+<details>
+<summary><b>Cortex/Mimir with Org ID</b></summary>
+
+```env
+PROMETHEUS_URL=https://mimir.example.com/prometheus
+PROMETHEUS_TOKEN=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ORG_ID=company-dev
+```
+</details>
 
 ### Installation Methods
+
+<details>
+<summary><b>Docker Desktop</b></summary>
+
+The easiest way to run the Prometheus MCP server is through Docker Desktop:
+
+1. **Via MCP Catalog**: Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus-mcp-server) and click "Add to Docker Desktop" (when available)
+   
+2. **Via MCP Toolkit**: Use Docker Desktop's MCP Toolkit extension to discover and install the server
+
+3. Configure your connection using the environment variables from the Configuration section above
+
+</details>
 
 <details>
 <summary><b>Claude Desktop</b></summary>
