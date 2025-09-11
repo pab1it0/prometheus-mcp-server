@@ -64,7 +64,7 @@ CMD ["/app/.venv/bin/prometheus-mcp-server"]
 
 LABEL org.opencontainers.image.title="Prometheus MCP Server" \
       org.opencontainers.image.description="Model Context Protocol server for Prometheus integration, enabling AI assistants to query metrics and monitor system health" \
-      org.opencontainers.image.version="1.2.5" \
+      org.opencontainers.image.version="1.2.6" \
       org.opencontainers.image.authors="Pavel Shklovsky <pavel@cloudefined.com>" \
       org.opencontainers.image.source="https://github.com/pab1it0/prometheus-mcp-server" \
       org.opencontainers.image.licenses="MIT" \
@@ -74,6 +74,7 @@ LABEL org.opencontainers.image.title="Prometheus MCP Server" \
       org.opencontainers.image.base.name="python:3.12-slim-bookworm" \
       org.opencontainers.image.created="" \
       org.opencontainers.image.revision="" \
+      io.modelcontextprotocol.server.name="io.github.pab1it0/prometheus-mcp-server" \
       mcp.server.name="prometheus-mcp-server" \
       mcp.server.category="monitoring" \
       mcp.server.tags="prometheus,monitoring,metrics,observability" \

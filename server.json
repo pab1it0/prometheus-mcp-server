@@ -1,0 +1,59 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.pab1it0/prometheus-mcp-server",
+  "description": "MCP server for Prometheus integration, enabling AI assistants to query metrics and monitor system health",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/pab1it0/prometheus-mcp-server",
+    "source": "github"
+  },
+  "version": "1.2.6",
+  "packages": [
+    {
+      "registry_type": "oci",
+      "registry_base_url": "https://ghcr.io",
+      "identifier": "pab1it0/prometheus-mcp-server",
+      "version": "1.2.6",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "Prometheus server URL (e.g., http://localhost:9090)",
+          "is_required": true,
+          "format": "string",
+          "is_secret": false,
+          "name": "PROMETHEUS_URL"
+        },
+        {
+          "description": "Username for Prometheus basic authentication",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false,
+          "name": "PROMETHEUS_USERNAME"
+        },
+        {
+          "description": "Password for Prometheus basic authentication",
+          "is_required": false,
+          "format": "string",
+          "is_secret": true,
+          "name": "PROMETHEUS_PASSWORD"
+        },
+        {
+          "description": "Bearer token for Prometheus authentication",
+          "is_required": false,
+          "format": "string",
+          "is_secret": true,
+          "name": "PROMETHEUS_TOKEN"
+        },
+        {
+          "description": "Organization ID for multi-tenant Prometheus setups",
+          "is_required": false,
+          "format": "string",
+          "is_secret": false,
+          "name": "ORG_ID"
+        }
+      ]
+    }
+  ]
+}
