@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "io.github.pab1it0/prometheus-mcp-server",
-  "description": "MCP server for Prometheus integration, enabling AI assistants to query metrics and monitor system health",
+  "description": "MCP server for Prometheus, enabling AI assistants to query metrics and monitor system health",
   "status": "active",
   "repository": {
     "url": "https://github.com/pab1it0/prometheus-mcp-server",
