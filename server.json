@@ -7,13 +7,13 @@
     "url": "https://github.com/pab1it0/prometheus-mcp-server",
     "source": "github"
   },
-  "version": "1.2.7",
+  "version": "1.2.8",
   "packages": [
     {
       "registry_type": "oci",
       "registry_base_url": "https://ghcr.io",
       "identifier": "pab1it0/prometheus-mcp-server",
-      "version": "1.2.7",
+      "version": "1.2.8",
       "transport": {
         "type": "stdio"
       },
