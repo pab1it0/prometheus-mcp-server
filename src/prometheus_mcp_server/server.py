@@ -270,8 +270,8 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     logger.info("Retrieving metric metadata", metric=metric)
     params = {"metric": metric}
     data = make_prometheus_request("metadata", params=params)
-    logger.info("Metric metadata retrieved", metric=metric, metadata_count=len(data["metadata"]))
-    return data["metadata"]
+    logger.info("Metric metadata retrieved", metric=metric, metadata_count=len(data))
+    return data
 
 @mcp.tool(description="Get information about all scrape targets")
 async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
