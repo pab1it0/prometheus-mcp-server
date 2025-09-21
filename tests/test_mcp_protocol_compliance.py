@@ -34,7 +34,7 @@ async def get_metric_metadata_wrapper(metric: str):
     """Wrapper to test get_metric_metadata functionality."""
     params = {"metric": metric}
     data = make_prometheus_request("metadata", params=params)
-    return data["metadata"][metric]
+    return data
 
 async def get_targets_wrapper():
     """Wrapper to test get_targets functionality."""
@@ -112,15 +112,13 @@ def mock_metadata_response():
     return {
         "status": "success",
         "data": {
-            "metadata": {
-                "up": [
-                    {
-                        "type": "gauge",
-                        "help": "1 if the instance is healthy, 0 otherwise",
-                        "unit": ""
-                    }
-                ]
-            }
+            "up": [
+                {
+                    "type": "gauge",
+                    "help": "1 if the instance is healthy, 0 otherwise",
+                    "unit": ""
+                }
+            ]
         }
     }
 
@@ -317,7 +315,7 @@ class TestMCPDataFormats:
             {"resultType": "vector", "result": []},  # execute_query
             {"resultType": "matrix", "result": []},  # execute_range_query
             ["metric1", "metric2"],  # list_metrics
-            {"metadata": {"metric1": [{"type": "gauge", "help": "test"}]}},  # get_metric_metadata
+            {"metric1": [{"type": "gauge", "help": "test"}]},  # get_metric_metadata
             {"activeTargets": [], "droppedTargets": []},  # get_targets
         ]
         
