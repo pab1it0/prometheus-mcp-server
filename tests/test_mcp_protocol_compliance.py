@@ -207,8 +207,12 @@ class TestMCPToolCompliance:
         mock_request.return_value = mock_metadata_response["data"]
         
         result = await get_metric_metadata_wrapper("up")
-        assert isinstance(result, list)
-        assert all(isinstance(metadata, dict) for metadata in result)
+        assert isinstance(result, dict)
+        # Check that the result contains metric names as keys and metadata lists as values
+        for metric_name, metadata_list in result.items():
+            assert isinstance(metric_name, str)
+            assert isinstance(metadata_list, list)
+            assert all(isinstance(metadata, dict) for metadata in metadata_list)
     
     @patch('test_mcp_protocol_compliance.make_prometheus_request')
     @pytest.mark.asyncio
