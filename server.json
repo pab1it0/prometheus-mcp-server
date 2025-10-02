@@ -7,7 +7,7 @@
     "url": "https://github.com/pab1it0/prometheus-mcp-server",
     "source": "github"
   },
-  "websiteUrl": "https://github.com/pab1it0/prometheus-mcp-server",
+  "websiteUrl": "https://pab1it0.github.io/prometheus-mcp-server",
   "packages": [
     {
       "registryType": "oci",
