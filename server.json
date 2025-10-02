@@ -1,57 +1,57 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.pab1it0/prometheus-mcp-server",
-  "description": "MCP server for Prometheus, enabling AI assistants to query metrics and monitor system health",
-  "status": "active",
+  "description": "MCP server providing Prometheus metrics access and PromQL query execution for AI assistants",
+  "version": "1.3.1",
   "repository": {
     "url": "https://github.com/pab1it0/prometheus-mcp-server",
     "source": "github"
   },
-  "version": "1.3.0",
+  "websiteUrl": "https://github.com/pab1it0/prometheus-mcp-server",
   "packages": [
     {
-      "registry_type": "oci",
-      "registry_base_url": "https://ghcr.io",
+      "registryType": "oci",
+      "registryBaseUrl": "https://ghcr.io",
       "identifier": "pab1it0/prometheus-mcp-server",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "transport": {
         "type": "stdio"
       },
-      "environment_variables": [
+      "environmentVariables": [
         {
+          "name": "PROMETHEUS_URL",
           "description": "Prometheus server URL (e.g., http://localhost:9090)",
-          "is_required": true,
+          "isRequired": true,
           "format": "string",
-          "is_secret": false,
-          "name": "PROMETHEUS_URL"
+          "isSecret": false
         },
         {
+          "name": "PROMETHEUS_USERNAME",
           "description": "Username for Prometheus basic authentication",
-          "is_required": false,
+          "isRequired": false,
           "format": "string",
-          "is_secret": false,
-          "name": "PROMETHEUS_USERNAME"
+          "isSecret": false
         },
         {
+          "name": "PROMETHEUS_PASSWORD",
           "description": "Password for Prometheus basic authentication",
-          "is_required": false,
+          "isRequired": false,
           "format": "string",
-          "is_secret": true,
-          "name": "PROMETHEUS_PASSWORD"
+          "isSecret": true
         },
         {
+          "name": "PROMETHEUS_TOKEN",
           "description": "Bearer token for Prometheus authentication",
-          "is_required": false,
+          "isRequired": false,
           "format": "string",
-          "is_secret": true,
-          "name": "PROMETHEUS_TOKEN"
+          "isSecret": true
         },
         {
+          "name": "ORG_ID",
           "description": "Organization ID for multi-tenant Prometheus setups",
-          "is_required": false,
+          "isRequired": false,
           "format": "string",
-          "is_secret": false,
-          "name": "ORG_ID"
+          "isSecret": false
         }
       ]
     }
