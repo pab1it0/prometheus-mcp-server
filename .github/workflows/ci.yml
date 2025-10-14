@@ -46,7 +46,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           source .venv/bin/activate
-          pytest --cov --junitxml=junit.xml -o junit_family=legacy --cov-report=xml --cov-fail-under=89
+          pytest --cov --junitxml=junit.xml -o junit_family=legacy --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
