@@ -34,7 +34,7 @@ async def get_metric_metadata_wrapper(metric: str):
     """Wrapper to test get_metric_metadata functionality."""
     params = {"metric": metric}
     data = make_prometheus_request("metadata", params=params)
-    return data
+    return data["data"][metric]
 
 async def get_targets_wrapper():
     """Wrapper to test get_targets functionality."""
@@ -112,13 +112,15 @@ def mock_metadata_response():
     return {
         "status": "success",
         "data": {
-            "up": [
-                {
-                    "type": "gauge",
-                    "help": "1 if the instance is healthy, 0 otherwise",
-                    "unit": ""
-                }
-            ]
+            "data": {
+                "up": [
+                    {
+                        "type": "gauge",
+                        "help": "1 if the instance is healthy, 0 otherwise",
+                        "unit": ""
+                    }
+                ]
+            }
         }
     }
 
@@ -207,12 +209,8 @@ class TestMCPToolCompliance:
         mock_request.return_value = mock_metadata_response["data"]
         
         result = await get_metric_metadata_wrapper("up")
-        assert isinstance(result, dict)
-        # Check that the result contains metric names as keys and metadata lists as values
-        for metric_name, metadata_list in result.items():
-            assert isinstance(metric_name, str)
-            assert isinstance(metadata_list, list)
-            assert all(isinstance(metadata, dict) for metadata in metadata_list)
+        assert isinstance(result, list)
+        assert all(isinstance(metadata, dict) for metadata in result)
     
     @patch('test_mcp_protocol_compliance.make_prometheus_request')
     @pytest.mark.asyncio
@@ -319,7 +317,7 @@ class TestMCPDataFormats:
             {"resultType": "vector", "result": []},  # execute_query
             {"resultType": "matrix", "result": []},  # execute_range_query
             ["metric1", "metric2"],  # list_metrics
-            {"metric1": [{"type": "gauge", "help": "test"}]},  # get_metric_metadata
+            {"data": {"metric1": [{"type": "gauge", "help": "test"}]}},  # get_metric_metadata
             {"activeTargets": [], "droppedTargets": []},  # get_targets
         ]
         

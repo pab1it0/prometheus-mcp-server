@@ -101,9 +101,9 @@ async def test_list_metrics(mock_make_request):
 async def test_get_metric_metadata(mock_make_request):
     """Test the get_metric_metadata tool."""
     # Setup
-    mock_make_request.return_value = [
+    mock_make_request.return_value = {"data": [
         {"metric": "up", "type": "gauge", "help": "Up indicates if the scrape was successful", "unit": ""}
-    ]
+    ]}
 
     async with Client(mcp) as client:
         # Execute
