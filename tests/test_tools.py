@@ -29,6 +29,10 @@ async def test_execute_query(mock_make_request):
         mock_make_request.assert_called_once_with("query", params={"query": "up"})
         assert result.data["resultType"] == "vector"
         assert len(result.data["result"]) == 1
+        # Verify resource links are included (MCP 2025 feature)
+        assert "links" in result.data
+        assert len(result.data["links"]) > 0
+        assert result.data["links"][0]["rel"] == "prometheus-ui"
 
 @pytest.mark.asyncio
 async def test_execute_query_with_time(mock_make_request):
@@ -66,9 +70,9 @@ async def test_execute_range_query(mock_make_request):
         # Execute
         result = await client.call_tool(
             "execute_range_query",{
-            "query": "up", 
-            "start": "2023-01-01T00:00:00Z", 
-            "end": "2023-01-01T01:00:00Z", 
+            "query": "up",
+            "start": "2023-01-01T00:00:00Z",
+            "end": "2023-01-01T01:00:00Z",
             "step": "15s"
         })
 
@@ -82,6 +86,10 @@ async def test_execute_range_query(mock_make_request):
         assert result.data["resultType"] == "matrix"
         assert len(result.data["result"]) == 1
         assert len(result.data["result"][0]["values"]) == 2
+        # Verify resource links are included (MCP 2025 feature)
+        assert "links" in result.data
+        assert len(result.data["links"]) > 0
+        assert result.data["links"][0]["rel"] == "prometheus-ui"
 
 @pytest.mark.asyncio
 async def test_list_metrics(mock_make_request):
