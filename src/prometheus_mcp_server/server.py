@@ -16,11 +16,24 @@ from prometheus_mcp_server.logging_config import get_logger
 dotenv.load_dotenv()
 mcp = FastMCP("Prometheus MCP")
 
+# Cache for metrics list to improve completion performance
+_metrics_cache = {"data": None, "timestamp": 0}
+_CACHE_TTL = 300  # 5 minutes
+
 # Get logger instance
 logger = get_logger()
 
 # Health check tool for Docker containers and monitoring
-@mcp.tool(description="Health check endpoint for container monitoring and status verification")
+@mcp.tool(
+    description="Health check endpoint for container monitoring and status verification",
+    annotations={
+        "title": "Health Check",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 async def health_check() -> Dict[str, Any]:
     """Return health status of the MCP server and Prometheus connection.
     
@@ -30,8 +43,8 @@ async def health_check() -> Dict[str, Any]:
     try:
         health_status = {
             "status": "healthy",
-            "service": "prometheus-mcp-server", 
-            "version": "1.2.3",
+            "service": "prometheus-mcp-server",
+            "version": "1.4.0",
             "timestamp": datetime.utcnow().isoformat(),
             "transport": config.mcp_server_config.mcp_server_transport if config.mcp_server_config else "stdio",
             "configuration": {
@@ -180,7 +193,45 @@ def make_prometheus_request(endpoint, params=None):
         logger.error("Unexpected error during Prometheus request", endpoint=endpoint, url=url, error=str(e), error_type=type(e).__name__)
         raise
 
-@mcp.tool(description="Execute a PromQL instant query against Prometheus")
+def get_cached_metrics() -> List[str]:
+    """Get metrics list with caching to improve completion performance.
+
+    This helper function is available for future completion support when
+    FastMCP implements the completion capability. For now, it can be used
+    internally to optimize repeated metric list requests.
+    """
+    current_time = time.time()
+
+    # Check if cache is valid
+    if _metrics_cache["data"] is not None and (current_time - _metrics_cache["timestamp"]) < _CACHE_TTL:
+        logger.debug("Using cached metrics list", cache_age=current_time - _metrics_cache["timestamp"])
+        return _metrics_cache["data"]
+
+    # Fetch fresh metrics
+    try:
+        data = make_prometheus_request("label/__name__/values")
+        _metrics_cache["data"] = data
+        _metrics_cache["timestamp"] = current_time
+        logger.debug("Refreshed metrics cache", metric_count=len(data))
+        return data
+    except Exception as e:
+        logger.error("Failed to fetch metrics for cache", error=str(e))
+        # Return cached data if available, even if expired
+        return _metrics_cache["data"] if _metrics_cache["data"] is not None else []
+
+# Note: Argument completions will be added when FastMCP supports the completion
+# capability. The get_cached_metrics() function above is ready for that integration.
+
+@mcp.tool(
+    description="Execute a PromQL instant query against Prometheus",
+    annotations={
+        "title": "Execute PromQL Query",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any]:
     """Execute an instant query against Prometheus.
     
@@ -197,21 +248,42 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
     
     logger.info("Executing instant query", query=query, time=time)
     data = make_prometheus_request("query", params=params)
-    
+
+    # Build Prometheus UI link
+    from urllib.parse import urlencode
+    ui_params = {"g0.expr": query, "g0.tab": "0"}
+    if time:
+        ui_params["g0.moment_input"] = time
+    prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
+
     result = {
         "resultType": data["resultType"],
-        "result": data["result"]
+        "result": data["result"],
+        "links": [{
+            "href": prometheus_ui_link,
+            "rel": "prometheus-ui",
+            "title": "View in Prometheus UI"
+        }]
     }
-    
-    logger.info("Instant query completed", 
-                query=query, 
-                result_type=data["resultType"], 
+
+    logger.info("Instant query completed",
+                query=query,
+                result_type=data["resultType"],
                 result_count=len(data["result"]) if isinstance(data["result"], list) else 1)
-    
+
     return result
 
-@mcp.tool(description="Execute a PromQL range query with start time, end time, and step interval")
-async def execute_range_query(query: str, start: str, end: str, step: str) -> Dict[str, Any]:
+@mcp.tool(
+    description="Execute a PromQL range query with start time, end time, and step interval",
+    annotations={
+        "title": "Execute PromQL Range Query",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def execute_range_query(query: str, start: str, end: str, step: str, ctx=None) -> Dict[str, Any]:
     """Execute a range query against Prometheus.
     
     Args:
@@ -229,35 +301,90 @@ async def execute_range_query(query: str, start: str, end: str, step: str) -> Di
         "end": end,
         "step": step
     }
-    
+
     logger.info("Executing range query", query=query, start=start, end=end, step=step)
+
+    # Report progress if context available
+    if ctx:
+        await ctx.report_progress(progress=0, total=100, message="Initiating range query...")
+
     data = make_prometheus_request("query_range", params=params)
-    
+
+    # Report progress
+    if ctx:
+        await ctx.report_progress(progress=50, total=100, message="Processing query results...")
+
+    # Build Prometheus UI link
+    from urllib.parse import urlencode
+    ui_params = {
+        "g0.expr": query,
+        "g0.tab": "0",
+        "g0.range_input": f"{start} to {end}",
+        "g0.step_input": step
+    }
+    prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
+
     result = {
         "resultType": data["resultType"],
-        "result": data["result"]
+        "result": data["result"],
+        "links": [{
+            "href": prometheus_ui_link,
+            "rel": "prometheus-ui",
+            "title": "View in Prometheus UI"
+        }]
     }
-    
-    logger.info("Range query completed", 
-                query=query, 
-                result_type=data["resultType"], 
+
+    # Report completion
+    if ctx:
+        await ctx.report_progress(progress=100, total=100, message="Range query completed")
+
+    logger.info("Range query completed",
+                query=query,
+                result_type=data["resultType"],
                 result_count=len(data["result"]) if isinstance(data["result"], list) else 1)
-    
+
     return result
 
-@mcp.tool(description="List all available metrics in Prometheus")
-async def list_metrics() -> List[str]:
+@mcp.tool(
+    description="List all available metrics in Prometheus",
+    annotations={
+        "title": "List Available Metrics",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def list_metrics(ctx=None) -> List[str]:
     """Retrieve a list of all metric names available in Prometheus.
-    
+
     Returns:
         List of metric names as strings
     """
     logger.info("Listing available metrics")
+
+    # Report progress if context available
+    if ctx:
+        await ctx.report_progress(progress=0, total=100, message="Fetching metrics list...")
+
     data = make_prometheus_request("label/__name__/values")
+
+    if ctx:
+        await ctx.report_progress(progress=100, total=100, message=f"Retrieved {len(data)} metrics")
+
     logger.info("Metrics list retrieved", metric_count=len(data))
     return data
 
-@mcp.tool(description="Get metadata for a specific metric")
+@mcp.tool(
+    description="Get metadata for a specific metric",
+    annotations={
+        "title": "Get Metric Metadata",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     """Get metadata about a specific metric.
     
@@ -277,7 +404,16 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     logger.info("Metric metadata retrieved", metric=metric, metadata_count=len(metadata))
     return metadata
 
-@mcp.tool(description="Get information about all scrape targets")
+@mcp.tool(
+    description="Get information about all scrape targets",
+    annotations={
+        "title": "Get Scrape Targets",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
 async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
     """Get information about all Prometheus scrape targets.
     
