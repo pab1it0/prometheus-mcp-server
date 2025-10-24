@@ -44,7 +44,7 @@ async def health_check() -> Dict[str, Any]:
         health_status = {
             "status": "healthy",
             "service": "prometheus-mcp-server",
-            "version": "1.4.0",
+            "version": "1.4.1",
             "timestamp": datetime.utcnow().isoformat(),
             "transport": config.mcp_server_config.mcp_server_transport if config.mcp_server_config else "stdio",
             "configuration": {

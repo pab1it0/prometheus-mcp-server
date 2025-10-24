@@ -1,6 +1,6 @@
-"""Tests for MCP 2025 specification features (v1.4.0).
+"""Tests for MCP 2025 specification features (v1.4.1).
 
-This module tests the following features added in v1.4.0:
+This module tests the following features added in v1.4.1:
 - Tool annotations (readOnlyHint, destructiveHint, idempotentHint, openWorldHint)
 - Tool titles for human-friendly display
 - Progress notifications for long-running operations
