@@ -25,6 +25,7 @@ This provides access to your Prometheus metrics and queries through standardized
 - [x] Docker containerization support
 
 - [x] Provide interactive tools for AI assistants
+- [x] GitHub Actions integration for automated code review
 
 The list of tools is configurable, so you can choose which tools you want to make available to the MCP client.
 This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
