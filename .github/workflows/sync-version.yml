@@ -1,0 +1,63 @@
+name: Sync Version
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'pyproject.toml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Extract version from pyproject.toml
+        id: get_version
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Update Dockerfile
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          sed -i "s/org.opencontainers.image.version=\"[^\"]*\"/org.opencontainers.image.version=\"$VERSION\"/" Dockerfile
+          echo "Updated Dockerfile with version $VERSION"
+
+      - name: Update server.json
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" server.json
+          echo "Updated server.json with version $VERSION"
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git diff --exit-code Dockerfile server.json || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add Dockerfile server.json
+          git commit -m "chore: sync version to ${{ steps.get_version.outputs.version }}"
+          git push
