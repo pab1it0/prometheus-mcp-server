@@ -53,6 +53,9 @@ CLAUDE.md
 .claude-flow/
 .swarm/
 
+# Task planning files
+tasks/
+
 # Security scan results
 trivy*.json
 trivy-*.json
