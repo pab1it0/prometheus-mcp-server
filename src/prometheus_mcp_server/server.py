@@ -113,6 +113,7 @@ class MCPServerConfig:
 @dataclass
 class PrometheusConfig:
     url: str
+    url_ssl_verify: bool = True
     # Optional credentials
     username: Optional[str] = None
     password: Optional[str] = None
@@ -124,6 +125,7 @@ class PrometheusConfig:
 
 config = PrometheusConfig(
     url=os.environ.get("PROMETHEUS_URL", ""),
+    url_ssl_verify=os.environ.get("PROMETHEUS_URL_SSL_VERIFY", "True").lower() in ("true", "1", "yes"),
     username=os.environ.get("PROMETHEUS_USERNAME", ""),
     password=os.environ.get("PROMETHEUS_PASSWORD", ""),
     token=os.environ.get("PROMETHEUS_TOKEN", ""),
@@ -150,6 +152,7 @@ def make_prometheus_request(endpoint, params=None):
         raise ValueError("Prometheus configuration is missing. Please set PROMETHEUS_URL environment variable.")
 
     url = f"{config.url.rstrip('/')}/api/v1/{endpoint}"
+    url_ssl_verify = config.url_ssl_verify
     auth = get_prometheus_auth()
     headers = {}
 
@@ -165,7 +168,7 @@ def make_prometheus_request(endpoint, params=None):
         logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params)
         
         # Make the request with appropriate headers and auth
-        response = requests.get(url, params=params, auth=auth, headers=headers)
+        response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify)
         
         response.raise_for_status()
         result = response.json()
