@@ -150,6 +150,8 @@ def make_prometheus_request(endpoint, params=None):
     if not config.url:
         logger.error("Prometheus configuration missing", error="PROMETHEUS_URL not set")
         raise ValueError("Prometheus configuration is missing. Please set PROMETHEUS_URL environment variable.")
+    if not config.url_ssl_verify:
+        logger.warning("SSL certificate verification is disabled. This is insecure and should not be used in production environments.", endpoint=endpoint)
 
     url = f"{config.url.rstrip('/')}/api/v1/{endpoint}"
     url_ssl_verify = config.url_ssl_verify

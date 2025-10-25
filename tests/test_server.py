@@ -242,3 +242,33 @@ def test_make_prometheus_request_list_data_format(mock_get):
 
     # Verify
     assert result == [{"metric": {}, "value": [1609459200, "1"]}]
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_ssl_verify_true(mock_get, mock_response):
+    """Test making a request to Prometheus with SSL verification enabled."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "https://test:9090"
+    config.url_ssl_verify = True  # Ensure SSL verification is enabled
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_ssl_verify_false(mock_get, mock_response):
+    """Test making a request to Prometheus with SSL verification disabled."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "https://test:9090"
+    config.url_ssl_verify = False  # Ensure SSL verification is disabled
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
