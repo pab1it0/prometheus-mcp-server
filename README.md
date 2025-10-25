@@ -4,6 +4,7 @@
 [![Codecov](https://codecov.io/gh/pab1it0/prometheus-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/pab1it0/prometheus-mcp-server)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License](https://img.shields.io/github/license/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/blob/main/LICENSE)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Enabled-blueviolet?logo=anthropic)](https://github.com/anthropics/claude-code-action)
 
 A [Model Context Protocol][mcp] (MCP) server for Prometheus.
 
