@@ -26,6 +26,13 @@
           "isSecret": false
         },
         {
+          "name": "PROMETHEUS_URL_SSL_VERIFY",
+          "description": "Set to False to disable SSL verification",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false
+        },
+        {
           "name": "PROMETHEUS_USERNAME",
           "description": "Username for Prometheus basic authentication",
           "isRequired": false,

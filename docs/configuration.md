@@ -12,6 +12,12 @@ The server is configured primarily through environment variables. These can be s
 |----------|-------------|--------|
 | `PROMETHEUS_URL` | URL of your Prometheus server | `http://prometheus:9090` |
 
+### Optional Variables for SSL
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `PROMETHEUS_URL_SSL_VERIFY` | Set to False to disable SSL verification | `True` |
+
 ### Authentication Variables
 
 Prometheus MCP Server supports multiple authentication methods. Choose the appropriate one for your Prometheus setup:

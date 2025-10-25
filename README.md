@@ -143,6 +143,7 @@ docker run -i --rm \
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `PROMETHEUS_URL` | URL of your Prometheus server | Yes |
+| `PROMETHEUS_URL_SSL_VERIFY` | Set to False to disable SSL verification | No |
 | `PROMETHEUS_USERNAME` | Username for basic authentication | No |
 | `PROMETHEUS_PASSWORD` | Password for basic authentication | No |
 | `PROMETHEUS_TOKEN` | Bearer token for authentication | No |
