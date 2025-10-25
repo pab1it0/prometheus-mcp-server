@@ -11,9 +11,8 @@ on:
     #   - "src/**/*.jsx"
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
-  issues: write
   id-token: write
   actions: read
 
@@ -27,9 +26,8 @@ jobs:
     
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
-      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     
@@ -45,16 +43,13 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # This is an optional setting that allows Claude to read CI results on PRs
-          additional_permissions: |
-            actions: read
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4.1)
           # model: "claude-opus-4-1-20250805"
 
-          # Direct prompt for automated review (no @claude mention needed)
-          direct_prompt: |
+          # Prompt for automated review (no @claude mention needed)
+          prompt: |
             Please review this pull request and provide feedback on:
             - Code quality and best practices
             - Potential bugs or issues
