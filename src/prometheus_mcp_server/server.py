@@ -408,6 +408,8 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
         metadata = data["data"]
     else:
         metadata = data
+    if isinstance(metadata, dict):
+        metadata = [metadata]
     logger.info("Metric metadata retrieved", metric=metric)
     return metadata
 
