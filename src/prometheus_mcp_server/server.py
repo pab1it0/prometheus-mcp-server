@@ -10,7 +10,7 @@ from enum import Enum
 
 import dotenv
 import requests
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from prometheus_mcp_server.logging_config import get_logger
 
 dotenv.load_dotenv()
@@ -288,7 +288,7 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
         "openWorldHint": True
     }
 )
-async def execute_range_query(query: str, start: str, end: str, step: str, ctx=None) -> Dict[str, Any]:
+async def execute_range_query(query: str, start: str, end: str, step: str, ctx: Context | None = None) -> Dict[str, Any]:
     """Execute a range query against Prometheus.
     
     Args:
@@ -360,7 +360,7 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx=N
         "openWorldHint": True
     }
 )
-async def list_metrics(ctx=None) -> List[str]:
+async def list_metrics(ctx: Context | None = None) -> List[str]:
     """Retrieve a list of all metric names available in Prometheus.
 
     Returns:
