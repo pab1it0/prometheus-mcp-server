@@ -45,7 +45,12 @@ jobs:
       - name: Update server.json
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" server.json
+          # Update top-level version field
+          jq --arg version "$VERSION" '.version = $version' server.json > server.json.tmp
+          # Update OCI package identifier with version tag (no 'v' prefix)
+          jq --arg version "$VERSION" '.packages[0].identifier = "ghcr.io/pab1it0/prometheus-mcp-server:" + $version' server.json.tmp > server.json.updated
+          mv server.json.updated server.json
+          rm -f server.json.tmp
           echo "Updated server.json with version $VERSION"
 
       - name: Check for changes
