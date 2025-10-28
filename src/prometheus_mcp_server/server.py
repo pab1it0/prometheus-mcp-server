@@ -410,7 +410,7 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
         metadata = data
     if isinstance(metadata, dict):
         metadata = [metadata]
-    logger.info("Metric metadata retrieved", metric=metric)
+    logger.info("Metric metadata retrieved", metric=metric, metadata_count=len(metadata))
     return metadata
 
 @mcp.tool(
