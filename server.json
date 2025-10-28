@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.pab1it0/prometheus-mcp-server",
   "description": "MCP server providing Prometheus metrics access and PromQL query execution for AI assistants",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "repository": {
     "url": "https://github.com/pab1it0/prometheus-mcp-server",
     "source": "github"
@@ -11,7 +11,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/pab1it0/prometheus-mcp-server:1.4.5",
+      "identifier": "ghcr.io/pab1it0/prometheus-mcp-server:1.4.6",
       "transport": {
         "type": "stdio"
       },
