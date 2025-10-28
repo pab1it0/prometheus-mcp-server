@@ -192,57 +192,71 @@ class TestResourceLinks:
     """Tests for resource links in query results."""
 
     @pytest.mark.asyncio
-    async def test_execute_query_includes_prometheus_ui_link(self, mock_make_request):
-        """Verify execute_query includes Prometheus UI link."""
-        mock_make_request.return_value = {
-            "resultType": "vector",
-            "result": [{"metric": {"__name__": "up"}, "value": [1617898448.214, "1"]}]
-        }
+    @pytest.mark.parametrize("disable_links,should_have_links", [
+        (False, True),
+        (True, False),
+    ])
+    async def test_execute_query_includes_prometheus_ui_link(self, mock_make_request, disable_links, should_have_links):
+        """Verify execute_query includes/excludes Prometheus UI link based on config."""
+        with patch("prometheus_mcp_server.server.config.disable_prometheus_links", disable_links):
+            mock_make_request.return_value = {
+                "resultType": "vector",
+                "result": [{"metric": {"__name__": "up"}, "value": [1617898448.214, "1"]}]
+            }
 
-        async with Client(mcp) as client:
-            result = await client.call_tool("execute_query", {"query": "up"})
+            async with Client(mcp) as client:
+                result = await client.call_tool("execute_query", {"query": "up"})
 
-            # Verify links are included
-            assert "links" in result.data, "Result should include links"
-            assert len(result.data["links"]) > 0, "Should have at least one link"
+                if should_have_links:
+                    assert "links" in result.data, "Result should include links"
+                    assert len(result.data["links"]) > 0, "Should have at least one link"
 
-            # Check link structure
-            link = result.data["links"][0]
-            assert "href" in link, "Link should have href"
-            assert "rel" in link, "Link should have rel"
-            assert "title" in link, "Link should have title"
+                    # Check link structure
+                    link = result.data["links"][0]
+                    assert "href" in link, "Link should have href"
+                    assert "rel" in link, "Link should have rel"
+                    assert "title" in link, "Link should have title"
 
-            # Verify link points to Prometheus
-            assert "/graph?" in link["href"]
-            assert link["rel"] == "prometheus-ui"
-            assert "up" in link["href"], "Query should be included in link"
+                    # Verify link points to Prometheus
+                    assert "/graph?" in link["href"]
+                    assert link["rel"] == "prometheus-ui"
+                    assert "up" in link["href"], "Query should be included in link"
+                else:
+                    assert "links" not in result.data, "Result should not include links when disabled"
 
     @pytest.mark.asyncio
-    async def test_execute_range_query_includes_prometheus_ui_link(self, mock_make_request):
-        """Verify execute_range_query includes Prometheus UI link with time parameters."""
-        mock_make_request.return_value = {
-            "resultType": "matrix",
-            "result": []
-        }
+    @pytest.mark.parametrize("disable_links,should_have_links", [
+        (False, True),
+        (True, False),
+    ])
+    async def test_execute_range_query_includes_prometheus_ui_link(self, mock_make_request, disable_links, should_have_links):
+        """Verify execute_range_query includes/excludes Prometheus UI link based on config."""
+        with patch("prometheus_mcp_server.server.config.disable_prometheus_links", disable_links):
+            mock_make_request.return_value = {
+                "resultType": "matrix",
+                "result": []
+            }
 
-        async with Client(mcp) as client:
-            result = await client.call_tool(
-                "execute_range_query",
-                {
-                    "query": "rate(http_requests_total[5m])",
-                    "start": "2023-01-01T00:00:00Z",
-                    "end": "2023-01-01T01:00:00Z",
-                    "step": "15s"
-                }
-            )
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "execute_range_query",
+                    {
+                        "query": "rate(http_requests_total[5m])",
+                        "start": "2023-01-01T00:00:00Z",
+                        "end": "2023-01-01T01:00:00Z",
+                        "step": "15s"
+                    }
+                )
 
-            # Verify links are included
-            assert "links" in result.data
-            link = result.data["links"][0]
+                if should_have_links:
+                    assert "links" in result.data
+                    link = result.data["links"][0]
 
-            # Verify time parameters are in the link
-            assert "rate" in link["href"] or "http_requests_total" in link["href"]
-            assert link["rel"] == "prometheus-ui"
+                    # Verify time parameters are in the link
+                    assert "rate" in link["href"] or "http_requests_total" in link["href"]
+                    assert link["rel"] == "prometheus-ui"
+                else:
+                    assert "links" not in result.data, "Result should not include links when disabled"
 
     @pytest.mark.asyncio
     async def test_query_link_includes_time_parameter(self, mock_make_request):

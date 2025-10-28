@@ -114,6 +114,7 @@ class MCPServerConfig:
 class PrometheusConfig:
     url: str
     url_ssl_verify: bool = True
+    disable_prometheus_links: bool = False
     # Optional credentials
     username: Optional[str] = None
     password: Optional[str] = None
@@ -126,6 +127,7 @@ class PrometheusConfig:
 config = PrometheusConfig(
     url=os.environ.get("PROMETHEUS_URL", ""),
     url_ssl_verify=os.environ.get("PROMETHEUS_URL_SSL_VERIFY", "True").lower() in ("true", "1", "yes"),
+    disable_prometheus_links=os.environ.get("PROMETHEUS_DISABLE_LINKS", "False").lower() in ("true", "1", "yes"),
     username=os.environ.get("PROMETHEUS_USERNAME", ""),
     password=os.environ.get("PROMETHEUS_PASSWORD", ""),
     token=os.environ.get("PROMETHEUS_TOKEN", ""),
@@ -254,22 +256,22 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
     logger.info("Executing instant query", query=query, time=time)
     data = make_prometheus_request("query", params=params)
 
-    # Build Prometheus UI link
-    from urllib.parse import urlencode
-    ui_params = {"g0.expr": query, "g0.tab": "0"}
-    if time:
-        ui_params["g0.moment_input"] = time
-    prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
-
     result = {
         "resultType": data["resultType"],
-        "result": data["result"],
-        "links": [{
+        "result": data["result"]
+    }
+
+    if not config.disable_prometheus_links:
+        from urllib.parse import urlencode
+        ui_params = {"g0.expr": query, "g0.tab": "0"}
+        if time:
+            ui_params["g0.moment_input"] = time
+        prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
+        result["links"] = [{
             "href": prometheus_ui_link,
             "rel": "prometheus-ui",
             "title": "View in Prometheus UI"
         }]
-    }
 
     logger.info("Instant query completed",
                 query=query,
@@ -319,25 +321,25 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx: 
     if ctx:
         await ctx.report_progress(progress=50, total=100, message="Processing query results...")
 
-    # Build Prometheus UI link
-    from urllib.parse import urlencode
-    ui_params = {
-        "g0.expr": query,
-        "g0.tab": "0",
-        "g0.range_input": f"{start} to {end}",
-        "g0.step_input": step
-    }
-    prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
-
     result = {
         "resultType": data["resultType"],
-        "result": data["result"],
-        "links": [{
+        "result": data["result"]
+    }
+
+    if not config.disable_prometheus_links:
+        from urllib.parse import urlencode
+        ui_params = {
+            "g0.expr": query,
+            "g0.tab": "0",
+            "g0.range_input": f"{start} to {end}",
+            "g0.step_input": step
+        }
+        prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
+        result["links"] = [{
             "href": prometheus_ui_link,
             "rel": "prometheus-ui",
             "title": "View in Prometheus UI"
         }]
-    }
 
     # Report completion
     if ctx:
