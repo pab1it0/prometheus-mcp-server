@@ -119,9 +119,10 @@ async def test_get_metric_metadata(mock_make_request):
 
         payload = result.content[0].text
         json_data = json.loads(payload)
+        print(json_data)
 
         # Verify
-        mock_make_request.assert_called_once_with("metadata", params={"metric": "up"})
+        mock_make_request.assert_called_once_with("metadata?metric=up", params=None)
         assert len(json_data) == 1
         assert json_data[0]["metric"] == "up"
         assert json_data[0]["type"] == "gauge"
