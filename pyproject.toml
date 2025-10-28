@@ -1,6 +1,6 @@
 [project]
 name = "prometheus_mcp_server"
-version = "1.4.5"
+version = "1.4.6"
 description = "MCP server for Prometheus integration"
 readme = "README.md"
 requires-python = ">=3.10"
