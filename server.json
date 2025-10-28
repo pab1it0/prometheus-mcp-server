@@ -33,6 +33,13 @@
           "isSecret": false
         },
         {
+          "name": "PROMETHEUS_DISABLE_LINKS",
+          "description": "Set to True to disable Prometheus UI links in query results (saves context tokens in MCP clients)",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false
+        },
+        {
           "name": "PROMETHEUS_USERNAME",
           "description": "Username for Prometheus basic authentication",
           "isRequired": false,
