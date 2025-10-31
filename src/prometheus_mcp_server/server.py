@@ -402,12 +402,16 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
         List of metadata entries for the metric
     """
     logger.info("Retrieving metric metadata", metric=metric)
-    params = {"metric": metric}
-    data = make_prometheus_request("metadata", params=params)
+    endpoint = f"metadata?metric={metric}"
+    data = make_prometheus_request(endpoint, params=None)
     if "metadata" in data:
         metadata = data["metadata"]
-    else:
+    elif "data" in data:
         metadata = data["data"]
+    else:
+        metadata = data
+    if isinstance(metadata, dict):
+        metadata = [metadata]
     logger.info("Metric metadata retrieved", metric=metric, metadata_count=len(metadata))
     return metadata
 

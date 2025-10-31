@@ -176,6 +176,65 @@ class TestDirectFunctionCalls:
         assert result[0]["type"] == "counter"
 
     @pytest.mark.asyncio
+    async def test_get_metric_metadata_fallback_to_raw_data(self, mock_make_request):
+        """Test get_metric_metadata when neither 'metadata' nor 'data' keys exist."""
+        # Test when data is returned directly (neither "metadata" nor "data" keys exist)
+        mock_make_request.return_value = [
+            {"metric": "cpu_usage", "type": "gauge", "help": "CPU usage", "unit": "percent"}
+        ]
+
+        result = await get_metric_metadata.fn(metric="cpu_usage")
+
+        assert len(result) == 1
+        assert result[0]["metric"] == "cpu_usage"
+        assert result[0]["type"] == "gauge"
+
+    @pytest.mark.asyncio
+    async def test_get_metric_metadata_dict_to_list_conversion(self, mock_make_request):
+        """Test get_metric_metadata when metadata is a dict and needs conversion to list."""
+        # Test when metadata is a single dict that needs to be converted to a list
+        mock_make_request.return_value = {
+            "metadata": {"metric": "memory_usage", "type": "gauge", "help": "Memory usage", "unit": "bytes"}
+        }
+
+        result = await get_metric_metadata.fn(metric="memory_usage")
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["metric"] == "memory_usage"
+        assert result[0]["type"] == "gauge"
+
+    @pytest.mark.asyncio
+    async def test_get_metric_metadata_data_key_dict_to_list(self, mock_make_request):
+        """Test get_metric_metadata when data is in 'data' key as a dict."""
+        # Test when data is in "data" key as a dict that needs conversion
+        mock_make_request.return_value = {
+            "data": {"metric": "disk_usage", "type": "gauge", "help": "Disk usage", "unit": "bytes"}
+        }
+
+        result = await get_metric_metadata.fn(metric="disk_usage")
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["metric"] == "disk_usage"
+        assert result[0]["type"] == "gauge"
+
+    @pytest.mark.asyncio
+    async def test_get_metric_metadata_raw_dict_to_list(self, mock_make_request):
+        """Test get_metric_metadata when raw data is a dict (fallback path with dict)."""
+        # Test when data is returned directly as a dict (neither "metadata" nor "data" keys)
+        mock_make_request.return_value = {
+            "metric": "network_bytes", "type": "counter", "help": "Network bytes", "unit": "bytes"
+        }
+
+        result = await get_metric_metadata.fn(metric="network_bytes")
+
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["metric"] == "network_bytes"
+        assert result[0]["type"] == "counter"
+
+    @pytest.mark.asyncio
     async def test_get_targets_direct_call(self, mock_make_request):
         """Test get_targets by calling it directly."""
         mock_make_request.return_value = {
