@@ -115,7 +115,7 @@ class TestDirectFunctionCalls:
 
         result = await list_metrics.fn(ctx=mock_ctx)
 
-        # Verify progress was reported
+        # Verify progress was reported (now expects 3 calls: start, processing, completion)
         assert mock_ctx.report_progress.call_count >= 2
         calls = mock_ctx.report_progress.call_args_list
 
@@ -129,9 +129,11 @@ class TestDirectFunctionCalls:
         assert calls[-1].kwargs["total"] == 100
         assert "3" in calls[-1].kwargs["message"]
 
-        # Verify result
-        assert len(result) == 3
-        assert "metric1" in result
+        # Verify result - now returns a dict with pagination info
+        assert isinstance(result, dict)
+        assert result["total_count"] == 3
+        assert result["returned_count"] == 3
+        assert "metric1" in result["metrics"]
 
     @pytest.mark.asyncio
     async def test_list_metrics_without_context(self, mock_make_request):
@@ -140,8 +142,11 @@ class TestDirectFunctionCalls:
 
         result = await list_metrics.fn(ctx=None)
 
-        assert len(result) == 2
-        assert "metric1" in result
+        # Now returns a dict with pagination info
+        assert isinstance(result, dict)
+        assert result["total_count"] == 2
+        assert result["returned_count"] == 2
+        assert "metric1" in result["metrics"]
 
     @pytest.mark.asyncio
     async def test_get_metric_metadata_direct_call(self, mock_make_request):
@@ -284,7 +289,7 @@ class TestHealthCheckFunction:
 
             assert result["status"] == "healthy"
             assert result["service"] == "prometheus-mcp-server"
-            assert result["version"] == "1.4.1"
+            assert result["version"] == "1.5.0"
             assert "timestamp" in result
             assert result["prometheus_connectivity"] == "healthy"
             assert result["prometheus_url"] == "http://prometheus:9090"

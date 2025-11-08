@@ -98,12 +98,53 @@ async def test_list_metrics(mock_make_request):
     mock_make_request.return_value = ["up", "go_goroutines", "http_requests_total"]
 
     async with Client(mcp) as client:
-        # Execute
+        # Execute - call without pagination
         result = await client.call_tool("list_metrics", {})
 
         # Verify
         mock_make_request.assert_called_once_with("label/__name__/values")
-        assert result.data == ["up", "go_goroutines", "http_requests_total"]
+        # Now returns a dict with pagination info
+        assert result.data["metrics"] == ["up", "go_goroutines", "http_requests_total"]
+        assert result.data["total_count"] == 3
+        assert result.data["returned_count"] == 3
+        assert result.data["offset"] == 0
+        assert result.data["has_more"] == False
+
+@pytest.mark.asyncio
+async def test_list_metrics_with_pagination(mock_make_request):
+    """Test the list_metrics tool with pagination."""
+    # Setup
+    mock_make_request.return_value = ["metric1", "metric2", "metric3", "metric4", "metric5"]
+
+    async with Client(mcp) as client:
+        # Execute - call with limit and offset
+        result = await client.call_tool("list_metrics", {"limit": 2, "offset": 1})
+
+        # Verify
+        mock_make_request.assert_called_once_with("label/__name__/values")
+        assert result.data["metrics"] == ["metric2", "metric3"]
+        assert result.data["total_count"] == 5
+        assert result.data["returned_count"] == 2
+        assert result.data["offset"] == 1
+        assert result.data["has_more"] == True
+
+@pytest.mark.asyncio
+async def test_list_metrics_with_filter(mock_make_request):
+    """Test the list_metrics tool with filter pattern."""
+    # Setup
+    mock_make_request.return_value = ["http_requests_total", "http_response_size", "go_goroutines", "up"]
+
+    async with Client(mcp) as client:
+        # Execute - call with filter
+        result = await client.call_tool("list_metrics", {"filter_pattern": "http"})
+
+        # Verify
+        mock_make_request.assert_called_once_with("label/__name__/values")
+        assert result.data["metrics"] == ["http_requests_total", "http_response_size"]
+        assert result.data["total_count"] == 2
+        assert result.data["returned_count"] == 2
+        assert result.data["offset"] == 0
+        assert result.data["has_more"] == False
 
 @pytest.mark.asyncio
 async def test_get_metric_metadata(mock_make_request):
