@@ -28,6 +28,7 @@ logger = get_logger()
     description="Health check endpoint for container monitoring and status verification",
     annotations={
         "title": "Health Check",
+        "icon": "❤️",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
@@ -36,7 +37,7 @@ logger = get_logger()
 )
 async def health_check() -> Dict[str, Any]:
     """Return health status of the MCP server and Prometheus connection.
-    
+
     Returns:
         Health status including service information, configuration, and connectivity
     """
@@ -44,7 +45,7 @@ async def health_check() -> Dict[str, Any]:
         health_status = {
             "status": "healthy",
             "service": "prometheus-mcp-server",
-            "version": "1.4.1",
+            "version": "1.5.0",
             "timestamp": datetime.utcnow().isoformat(),
             "transport": config.mcp_server_config.mcp_server_transport if config.mcp_server_config else "stdio",
             "configuration": {
@@ -233,6 +234,7 @@ def get_cached_metrics() -> List[str]:
     description="Execute a PromQL instant query against Prometheus",
     annotations={
         "title": "Execute PromQL Query",
+        "icon": "📊",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
@@ -241,11 +243,11 @@ def get_cached_metrics() -> List[str]:
 )
 async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any]:
     """Execute an instant query against Prometheus.
-    
+
     Args:
         query: PromQL query string
         time: Optional RFC3339 or Unix timestamp (default: current time)
-        
+
     Returns:
         Query result with type (vector, matrix, scalar, string) and values
     """
@@ -284,6 +286,7 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
     description="Execute a PromQL range query with start time, end time, and step interval",
     annotations={
         "title": "Execute PromQL Range Query",
+        "icon": "📈",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
@@ -292,13 +295,13 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
 )
 async def execute_range_query(query: str, start: str, end: str, step: str, ctx: Context | None = None) -> Dict[str, Any]:
     """Execute a range query against Prometheus.
-    
+
     Args:
         query: PromQL query string
         start: Start time as RFC3339 or Unix timestamp
         end: End time as RFC3339 or Unix timestamp
         step: Query resolution step width (e.g., '15s', '1m', '1h')
-        
+
     Returns:
         Range query result with type (usually matrix) and values over time
     """
@@ -353,22 +356,38 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx: 
     return result
 
 @mcp.tool(
-    description="List all available metrics in Prometheus",
+    description="List all available metrics in Prometheus with optional pagination support",
     annotations={
         "title": "List Available Metrics",
+        "icon": "📋",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
         "openWorldHint": True
     }
 )
-async def list_metrics(ctx: Context | None = None) -> List[str]:
+async def list_metrics(
+    limit: Optional[int] = None,
+    offset: int = 0,
+    filter_pattern: Optional[str] = None,
+    ctx: Context | None = None
+) -> Dict[str, Any]:
     """Retrieve a list of all metric names available in Prometheus.
 
+    Args:
+        limit: Maximum number of metrics to return (default: all metrics)
+        offset: Number of metrics to skip for pagination (default: 0)
+        filter_pattern: Optional substring to filter metric names (case-insensitive)
+
     Returns:
-        List of metric names as strings
+        Dictionary containing:
+        - metrics: List of metric names
+        - total_count: Total number of metrics (before pagination)
+        - returned_count: Number of metrics returned
+        - offset: Current offset
+        - has_more: Whether more metrics are available
     """
-    logger.info("Listing available metrics")
+    logger.info("Listing available metrics", limit=limit, offset=offset, filter_pattern=filter_pattern)
 
     # Report progress if context available
     if ctx:
@@ -377,15 +396,45 @@ async def list_metrics(ctx: Context | None = None) -> List[str]:
     data = make_prometheus_request("label/__name__/values")
 
     if ctx:
-        await ctx.report_progress(progress=100, total=100, message=f"Retrieved {len(data)} metrics")
+        await ctx.report_progress(progress=50, total=100, message=f"Processing {len(data)} metrics...")
 
-    logger.info("Metrics list retrieved", metric_count=len(data))
-    return data
+    # Apply filter if provided
+    if filter_pattern:
+        filtered_data = [m for m in data if filter_pattern.lower() in m.lower()]
+        logger.debug("Applied filter", original_count=len(data), filtered_count=len(filtered_data), pattern=filter_pattern)
+        data = filtered_data
+
+    total_count = len(data)
+
+    # Apply pagination
+    start_idx = offset
+    end_idx = offset + limit if limit is not None else len(data)
+    paginated_data = data[start_idx:end_idx]
+
+    result = {
+        "metrics": paginated_data,
+        "total_count": total_count,
+        "returned_count": len(paginated_data),
+        "offset": offset,
+        "has_more": end_idx < total_count
+    }
+
+    if ctx:
+        await ctx.report_progress(progress=100, total=100, message=f"Retrieved {len(paginated_data)} of {total_count} metrics")
+
+    logger.info("Metrics list retrieved",
+                total_count=total_count,
+                returned_count=len(paginated_data),
+                offset=offset,
+                has_more=result["has_more"])
+
+    return result
 
 @mcp.tool(
     description="Get metadata for a specific metric",
     annotations={
         "title": "Get Metric Metadata",
+        "icon": "ℹ️",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
@@ -394,10 +443,10 @@ async def list_metrics(ctx: Context | None = None) -> List[str]:
 )
 async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     """Get metadata about a specific metric.
-    
+
     Args:
         metric: The name of the metric to retrieve metadata for
-        
+
     Returns:
         List of metadata entries for the metric
     """
@@ -419,6 +468,7 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     description="Get information about all scrape targets",
     annotations={
         "title": "Get Scrape Targets",
+        "icon": "🎯",
         "readOnlyHint": True,
         "destructiveHint": False,
         "idempotentHint": True,
@@ -427,7 +477,7 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
 )
 async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
     """Get information about all Prometheus scrape targets.
-    
+
     Returns:
         Dictionary with active and dropped targets information
     """

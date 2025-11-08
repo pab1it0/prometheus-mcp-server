@@ -183,9 +183,11 @@ class TestProgressNotifications:
             # Execute - should not error even though progress is implemented
             result = await client.call_tool("list_metrics", {})
 
-            # Verify result is valid
-            assert len(result.data) == 3
-            assert "metric1" in result.data
+            # Verify result is valid - now returns a dict with pagination info
+            assert isinstance(result.data, dict)
+            assert result.data["total_count"] == 3
+            assert result.data["returned_count"] == 3
+            assert "metric1" in result.data["metrics"]
 
 
 class TestResourceLinks:

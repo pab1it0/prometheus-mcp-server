@@ -196,11 +196,40 @@ When adding new features, please also add corresponding tests.
 
 | Tool | Category | Description |
 | --- | --- | --- |
-| `execute_query` | Query | Execute a PromQL instant query against Prometheus |
-| `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
-| `list_metrics` | Discovery | List all available metrics in Prometheus |
-| `get_metric_metadata` | Discovery | Get metadata for a specific metric |
-| `get_targets` | Discovery | Get information about all scrape targets |
+| `health_check` ❤️ | System | Health check endpoint for container monitoring and status verification |
+| `execute_query` 📊 | Query | Execute a PromQL instant query against Prometheus |
+| `execute_range_query` 📈 | Query | Execute a PromQL range query with start time, end time, and step interval |
+| `list_metrics` 📋 | Discovery | List all available metrics in Prometheus with pagination and filtering support |
+| `get_metric_metadata` ℹ️ | Discovery | Get metadata for a specific metric |
+| `get_targets` 🎯 | Discovery | Get information about all scrape targets |
+
+#### list_metrics Pagination
+
+The `list_metrics` tool now supports pagination and filtering for better performance with large metric sets:
+
+```python
+# Get all metrics (default)
+list_metrics()
+
+# Get first 100 metrics
+list_metrics(limit=100)
+
+# Get next 100 metrics (offset pagination)
+list_metrics(limit=100, offset=100)
+
+# Filter metrics by pattern
+list_metrics(filter_pattern="http")
+
+# Combine pagination and filtering
+list_metrics(limit=50, offset=0, filter_pattern="cpu")
+```
+
+Returns a dictionary with:
+- `metrics`: List of metric names
+- `total_count`: Total number of metrics (before pagination)
+- `returned_count`: Number of metrics in this response
+- `offset`: Current offset value
+- `has_more`: Boolean indicating if more metrics are available
 
 ## License
 
