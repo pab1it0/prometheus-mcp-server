@@ -34,7 +34,6 @@ This is useful if you don't use certain functionality or if you don't want to ta
 ### Prerequisites
 
 - Prometheus server accessible from your environment
-- Docker Desktop (recommended) or Docker CLI
 - MCP-compatible client (Claude Desktop, VS Code, Cursor, Windsurf, etc.)
 
 ### Installation Methods
