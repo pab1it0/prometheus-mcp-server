@@ -18,6 +18,12 @@ The server is configured primarily through environment variables. These can be s
 |----------|-------------|--------|
 | `PROMETHEUS_URL_SSL_VERIFY` | Set to False to disable SSL verification | `True` |
 
+### Optional headers for Prometheus requests
+
+| Variable | Description | Example |
+|----------|-------------|--------|
+| `PROMETHEUS_CUSTOM_HEADERS` | Custom headers to include in requests to Prometheus, formatted as a JSON string | `{"X-Custom-Header": "value"}` |
+
 ### Authentication Variables
 
 Prometheus MCP Server supports multiple authentication methods. Choose the appropriate one for your Prometheus setup:

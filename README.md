@@ -152,7 +152,7 @@ docker run -i --rm \
 | `PROMETHEUS_MCP_SERVER_TRANSPORT` | Transport mode (stdio, http, sse) | No (default: stdio) |
 | `PROMETHEUS_MCP_BIND_HOST` | Host for HTTP transport | No (default: 127.0.0.1) |
 | `PROMETHEUS_MCP_BIND_PORT` | Port for HTTP transport | No (default: 8080) |
-
+| `PROMETHEUS_CUSTOM_HEADERS` | Custom headers as JSON string | No |
 
 ## Development
 

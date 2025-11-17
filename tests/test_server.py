@@ -272,3 +272,235 @@ def test_make_prometheus_request_ssl_verify_false(mock_get, mock_response):
     # Verify
     mock_get.assert_called_once()
     assert result == {"resultType": "vector", "result": []}
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_custom_headers(mock_get, mock_response):
+    """Test making a request with custom headers."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    config.custom_headers = {"X-Custom-Header": "custom-value"}
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Check that custom header was included
+    call_args = mock_get.call_args
+    headers = call_args[1]['headers']
+    assert 'X-Custom-Header' in headers
+    assert headers['X-Custom-Header'] == 'custom-value'
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_multiple_custom_headers(mock_get, mock_response):
+    """Test making a request with multiple custom headers."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    config.custom_headers = {
+        "X-Custom-Header-1": "value1",
+        "X-Custom-Header-2": "value2",
+        "X-Environment": "test"
+    }
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Check that all custom headers were included
+    call_args = mock_get.call_args
+    headers = call_args[1]['headers']
+    assert 'X-Custom-Header-1' in headers
+    assert headers['X-Custom-Header-1'] == 'value1'
+    assert 'X-Custom-Header-2' in headers
+    assert headers['X-Custom-Header-2'] == 'value2'
+    assert 'X-Environment' in headers
+    assert headers['X-Environment'] == 'test'
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_custom_headers_and_token_auth(mock_get, mock_response):
+    """Test making a request with custom headers combined with token authentication."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    config.custom_headers = {"X-Custom-Header": "custom-value"}
+    config.token = "token123"
+    config.username = ""
+    config.password = ""
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Check that both Authorization and custom headers were included
+    call_args = mock_get.call_args
+    headers = call_args[1]['headers']
+    assert 'Authorization' in headers
+    assert headers['Authorization'] == 'Bearer token123'
+    assert 'X-Custom-Header' in headers
+    assert headers['X-Custom-Header'] == 'custom-value'
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+    config.token = ""
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_custom_headers_and_org_id(mock_get, mock_response):
+    """Test making a request with custom headers combined with org_id."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    original_org_id = config.org_id
+    config.custom_headers = {"X-Custom-Header": "custom-value"}
+    config.org_id = "test-org"
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Check that both org_id and custom headers were included
+    call_args = mock_get.call_args
+    headers = call_args[1]['headers']
+    assert 'X-Scope-OrgID' in headers
+    assert headers['X-Scope-OrgID'] == 'test-org'
+    assert 'X-Custom-Header' in headers
+    assert headers['X-Custom-Header'] == 'custom-value'
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+    config.org_id = original_org_id
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_empty_custom_headers(mock_get, mock_response):
+    """Test making a request with empty custom headers dictionary."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    config.custom_headers = {}
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_none_custom_headers(mock_get, mock_response):
+    """Test making a request with None custom headers."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    config.custom_headers = None
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_custom_headers_and_basic_auth(mock_get, mock_response):
+    """Test making a request with custom headers combined with basic authentication."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    config.custom_headers = {"X-Custom-Header": "custom-value"}
+    config.username = "user"
+    config.password = "pass"
+    config.token = ""
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Check that custom headers were included (basic auth is passed separately)
+    call_args = mock_get.call_args
+    headers = call_args[1]['headers']
+    assert 'X-Custom-Header' in headers
+    assert headers['X-Custom-Header'] == 'custom-value'
+    # Basic auth should be in the auth parameter, not headers
+    auth = call_args[1]['auth']
+    assert auth is not None
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+    config.username = ""
+    config.password = ""
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_with_all_headers_combined(mock_get, mock_response):
+    """Test making a request with custom headers, org_id, and token auth all combined."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "http://test:9090"
+    original_custom_headers = config.custom_headers
+    original_org_id = config.org_id
+    config.custom_headers = {
+        "X-Custom-Header-1": "value1",
+        "X-Custom-Header-2": "value2"
+    }
+    config.org_id = "test-org"
+    config.token = "token123"
+    config.username = ""
+    config.password = ""
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    assert result == {"resultType": "vector", "result": []}
+
+    # Check that all headers were included
+    call_args = mock_get.call_args
+    headers = call_args[1]['headers']
+    assert 'Authorization' in headers
+    assert headers['Authorization'] == 'Bearer token123'
+    assert 'X-Scope-OrgID' in headers
+    assert headers['X-Scope-OrgID'] == 'test-org'
+    assert 'X-Custom-Header-1' in headers
+    assert headers['X-Custom-Header-1'] == 'value1'
+    assert 'X-Custom-Header-2' in headers
+    assert headers['X-Custom-Header-2'] == 'value2'
+
+    # Cleanup
+    config.custom_headers = original_custom_headers
+    config.org_id = original_org_id
+    config.token = ""
+
