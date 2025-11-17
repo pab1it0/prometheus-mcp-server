@@ -124,6 +124,8 @@ class PrometheusConfig:
     org_id: Optional[str] = None
     # Optional Custom MCP Server Configuration
     mcp_server_config: Optional[MCPServerConfig] = None
+    # Optional custom headers for Prometheus requests
+    custom_headers: Optional[Dict[str, str]] = None
 
 config = PrometheusConfig(
     url=os.environ.get("PROMETHEUS_URL", ""),
@@ -137,7 +139,8 @@ config = PrometheusConfig(
         mcp_server_transport=os.environ.get("PROMETHEUS_MCP_SERVER_TRANSPORT", "stdio").lower(),
         mcp_bind_host=os.environ.get("PROMETHEUS_MCP_BIND_HOST", "127.0.0.1"),
         mcp_bind_port=int(os.environ.get("PROMETHEUS_MCP_BIND_PORT", "8080"))
-    )
+    ),
+    custom_headers=json.loads(os.environ.get("PROMETHEUS_CUSTOM_HEADERS")) if os.environ.get("PROMETHEUS_CUSTOM_HEADERS") else None,
 )
 
 def get_prometheus_auth():
@@ -169,9 +172,12 @@ def make_prometheus_request(endpoint, params=None):
     if config.org_id:
         headers["X-Scope-OrgID"] = config.org_id
 
+    if config.custom_headers:
+        headers.update(config.custom_headers)
+
     try:
-        logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params)
-        
+        logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params, headers=headers)
+
         # Make the request with appropriate headers and auth
         response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify)
         
