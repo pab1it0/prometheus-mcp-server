@@ -263,7 +263,7 @@ If you believe a release should be created, please open an issue to discuss it w
 
 - **Questions**: Use the [question template](https://github.com/pab1it0/prometheus-mcp-server/issues/new?template=question.yml)
 - **Discussions**: Check existing [issues](https://github.com/pab1it0/prometheus-mcp-server/issues) for similar questions
-- **Documentation**: Review the [README](README.md) and [docs](docs/) folder
+- **Documentation**: Review the [README](README.md) for comprehensive documentation
 
 ### Recognition
 
