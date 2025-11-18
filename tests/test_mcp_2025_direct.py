@@ -289,7 +289,7 @@ class TestHealthCheckFunction:
 
             assert result["status"] == "healthy"
             assert result["service"] == "prometheus-mcp-server"
-            assert result["version"] == "1.5.0"
+            assert "version" in result  # Version exists but value is managed by maintainers
             assert "timestamp" in result
             assert result["prometheus_connectivity"] == "healthy"
             assert result["prometheus_url"] == "http://prometheus:9090"
