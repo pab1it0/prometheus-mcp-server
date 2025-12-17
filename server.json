@@ -3,7 +3,7 @@
   "name": "io.github.pab1it0/prometheus-mcp-server",
   "title": "Prometheus MCP Server",
   "description": "MCP server providing Prometheus metrics access and PromQL query execution for AI assistants",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "repository": {
     "url": "https://github.com/pab1it0/prometheus-mcp-server",
     "source": "github"
@@ -12,7 +12,7 @@
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/pab1it0/prometheus-mcp-server:1.5.1",
+      "identifier": "ghcr.io/pab1it0/prometheus-mcp-server:1.5.2",
       "transport": {
         "type": "stdio"
       },
