@@ -152,6 +152,7 @@ docker run -i --rm \
 | `PROMETHEUS_MCP_BIND_HOST` | Host for HTTP transport | No (default: 127.0.0.1) |
 | `PROMETHEUS_MCP_BIND_PORT` | Port for HTTP transport | No (default: 8080) |
 | `PROMETHEUS_CUSTOM_HEADERS` | Custom headers as JSON string | No |
+| `TOOL_PREFIX` | Prefix for all tool names (e.g., `staging` results in `staging_execute_query`). Useful for running multiple instances targeting different environments in Cursor | No |
 
 ## Development
 

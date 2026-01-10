@@ -14,7 +14,17 @@ from fastmcp import FastMCP, Context
 from prometheus_mcp_server.logging_config import get_logger
 
 dotenv.load_dotenv()
-mcp = FastMCP("Prometheus MCP")
+
+# Get tool prefix from environment (empty string for backward compatibility)
+TOOL_PREFIX = os.environ.get("TOOL_PREFIX", "")
+
+def _tool_name(name: str) -> str:
+    """Build tool name with optional prefix."""
+    return f"{TOOL_PREFIX}_{name}" if TOOL_PREFIX else name
+
+# Include prefix in MCP server name if set
+mcp_name = f"Prometheus MCP ({TOOL_PREFIX})" if TOOL_PREFIX else "Prometheus MCP"
+mcp = FastMCP(mcp_name)
 
 # Cache for metrics list to improve completion performance
 _metrics_cache = {"data": None, "timestamp": 0}
@@ -25,6 +35,7 @@ logger = get_logger()
 
 # Health check tool for Docker containers and monitoring
 @mcp.tool(
+    name=_tool_name("health_check"),
     description="Health check endpoint for container monitoring and status verification",
     annotations={
         "title": "Health Check",
@@ -237,6 +248,7 @@ def get_cached_metrics() -> List[str]:
 # capability. The get_cached_metrics() function above is ready for that integration.
 
 @mcp.tool(
+    name=_tool_name("execute_query"),
     description="Execute a PromQL instant query against Prometheus",
     annotations={
         "title": "Execute PromQL Query",
@@ -289,6 +301,7 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
     return result
 
 @mcp.tool(
+    name=_tool_name("execute_range_query"),
     description="Execute a PromQL range query with start time, end time, and step interval",
     annotations={
         "title": "Execute PromQL Range Query",
@@ -362,6 +375,7 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx: 
     return result
 
 @mcp.tool(
+    name=_tool_name("list_metrics"),
     description="List all available metrics in Prometheus with optional pagination support",
     annotations={
         "title": "List Available Metrics",
@@ -437,6 +451,7 @@ async def list_metrics(
     return result
 
 @mcp.tool(
+    name=_tool_name("get_metric_metadata"),
     description="Get metadata for a specific metric",
     annotations={
         "title": "Get Metric Metadata",
@@ -471,6 +486,7 @@ async def get_metric_metadata(metric: str) -> List[Dict[str, Any]]:
     return metadata
 
 @mcp.tool(
+    name=_tool_name("get_targets"),
     description="Get information about all scrape targets",
     annotations={
         "title": "Get Scrape Targets",
