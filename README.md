@@ -144,6 +144,7 @@ docker run -i --rm \
 | `PROMETHEUS_URL` | URL of your Prometheus server | Yes |
 | `PROMETHEUS_URL_SSL_VERIFY` | Set to False to disable SSL verification | No |
 | `PROMETHEUS_DISABLE_LINKS` | Set to True to disable Prometheus UI links in query results (saves context tokens) | No |
+| `PROMETHEUS_REQUEST_TIMEOUT` | Request timeout in seconds to prevent hanging requests (DDoS protection) | No (default: 30) |
 | `PROMETHEUS_USERNAME` | Username for basic authentication | No |
 | `PROMETHEUS_PASSWORD` | Password for basic authentication | No |
 | `PROMETHEUS_TOKEN` | Bearer token for authentication | No |

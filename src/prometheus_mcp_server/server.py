@@ -137,6 +137,8 @@ class PrometheusConfig:
     mcp_server_config: Optional[MCPServerConfig] = None
     # Optional custom headers for Prometheus requests
     custom_headers: Optional[Dict[str, str]] = None
+    # Request timeout in seconds to prevent hanging requests (DDoS protection)
+    request_timeout: int = 30
 
 config = PrometheusConfig(
     url=os.environ.get("PROMETHEUS_URL", ""),
@@ -152,6 +154,7 @@ config = PrometheusConfig(
         mcp_bind_port=int(os.environ.get("PROMETHEUS_MCP_BIND_PORT", "8080"))
     ),
     custom_headers=json.loads(os.environ.get("PROMETHEUS_CUSTOM_HEADERS")) if os.environ.get("PROMETHEUS_CUSTOM_HEADERS") else None,
+    request_timeout=int(os.environ.get("PROMETHEUS_REQUEST_TIMEOUT", "30")),
 )
 
 def get_prometheus_auth():
@@ -187,11 +190,11 @@ def make_prometheus_request(endpoint, params=None):
         headers.update(config.custom_headers)
 
     try:
-        logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params, headers=headers)
+        logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params, headers=headers, timeout=config.request_timeout)
 
-        # Make the request with appropriate headers and auth
-        response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify)
-        
+        # Make the request with appropriate headers, auth, and timeout (DDoS protection)
+        response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify, timeout=config.request_timeout)
+
         response.raise_for_status()
         result = response.json()
         
