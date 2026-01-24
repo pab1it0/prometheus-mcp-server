@@ -12,39 +12,6 @@ A [Model Context Protocol][mcp] (MCP) server that provides access to your Promet
 
 [mcp]: https://modelcontextprotocol.io
 
-## Quick Start
-
-```bash
-docker run -i --rm -e PROMETHEUS_URL="http://your-prometheus:9090" ghcr.io/pab1it0/prometheus-mcp-server:latest
-```
-
-## Available Tools
-
-| Tool | Category | Description |
-| --- | --- | --- |
-| `health_check` | System | Health check endpoint for container monitoring and status verification |
-| `execute_query` | Query | Execute a PromQL instant query against Prometheus |
-| `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
-| `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
-| `get_metric_metadata` | Discovery | Get metadata for a specific metric |
-| `get_targets` | Discovery | Get information about all scrape targets |
-
-The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
-
-## Features
-
-- Execute PromQL queries against Prometheus
-- Discover and explore metrics
-  - List available metrics
-  - Get metadata for specific metrics
-  - View instant query results
-  - View range query results with different step intervals
-- Authentication support
-  - Basic auth from environment variables
-  - Bearer token auth from environment variables
-- Docker containerization support
-- Provide interactive tools for AI assistants
-
 ## Getting Started
 
 ### Prerequisites
@@ -170,6 +137,33 @@ docker run -i --rm \
 | `PROMETHEUS_MCP_BIND_PORT` | Port for HTTP transport | No (default: 8080) |
 | `PROMETHEUS_CUSTOM_HEADERS` | Custom headers as JSON string | No |
 | `TOOL_PREFIX` | Prefix for all tool names (e.g., `staging` results in `staging_execute_query`). Useful for running multiple instances targeting different environments in Cursor | No |
+
+## Available Tools
+
+| Tool | Category | Description |
+| --- | --- | --- |
+| `health_check` | System | Health check endpoint for container monitoring and status verification |
+| `execute_query` | Query | Execute a PromQL instant query against Prometheus |
+| `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
+| `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
+| `get_metric_metadata` | Discovery | Get metadata for a specific metric |
+| `get_targets` | Discovery | Get information about all scrape targets |
+
+The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
+
+## Features
+
+- Execute PromQL queries against Prometheus
+- Discover and explore metrics
+  - List available metrics
+  - Get metadata for specific metrics
+  - View instant query results
+  - View range query results with different step intervals
+- Authentication support
+  - Basic auth from environment variables
+  - Bearer token auth from environment variables
+- Docker containerization support
+- Provide interactive tools for AI assistants
 
 ## Development
 
