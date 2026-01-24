@@ -1,33 +1,16 @@
 # Prometheus MCP Server
+
 [![GitHub Container Registry](https://img.shields.io/badge/ghcr.io-pab1it0%2Fprometheus--mcp--server-blue?logo=docker)](https://github.com/users/pab1it0/packages/container/package/prometheus-mcp-server)
 [![GitHub Release](https://img.shields.io/github/v/release/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/releases)
 [![Codecov](https://codecov.io/gh/pab1it0/prometheus-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/pab1it0/prometheus-mcp-server)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 [![License](https://img.shields.io/github/license/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/blob/main/LICENSE)
 
-A [Model Context Protocol][mcp] (MCP) server for Prometheus.
+Give AI assistants the power to query your Prometheus metrics.
 
-This provides access to your Prometheus metrics and queries through standardized MCP interfaces, allowing AI assistants to execute PromQL queries and analyze your metrics data.
+A [Model Context Protocol][mcp] (MCP) server that provides access to your Prometheus metrics and queries through standardized MCP interfaces, allowing AI assistants to execute PromQL queries and analyze your metrics data.
 
 [mcp]: https://modelcontextprotocol.io
-
-## Features
-
-- [x] Execute PromQL queries against Prometheus
-- [x] Discover and explore metrics
-  - [x] List available metrics
-  - [x] Get metadata for specific metrics
-  - [x] View instant query results
-  - [x] View range query results with different step intervals
-- [x] Authentication support
-  - [x] Basic auth from environment variables
-  - [x] Bearer token auth from environment variables
-- [x] Docker containerization support
-
-- [x] Provide interactive tools for AI assistants
-
-The list of tools is configurable, so you can choose which tools you want to make available to the MCP client.
-This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
 
 ## Getting Started
 
@@ -110,7 +93,7 @@ The easiest way to run the Prometheus MCP server is through Docker Desktop:
 </a>
 
 1. **Via MCP Catalog**: Visit the [Prometheus MCP Server on Docker Hub](https://hub.docker.com/mcp/server/prometheus/overview) and click the button above
-   
+
 2. **Via MCP Toolkit**: Use Docker Desktop's MCP Toolkit extension to discover and install the server
 
 3. Configure your connection using environment variables (see Configuration Options below)
@@ -155,6 +138,33 @@ docker run -i --rm \
 | `PROMETHEUS_CUSTOM_HEADERS` | Custom headers as JSON string | No |
 | `TOOL_PREFIX` | Prefix for all tool names (e.g., `staging` results in `staging_execute_query`). Useful for running multiple instances targeting different environments in Cursor | No |
 
+## Available Tools
+
+| Tool | Category | Description |
+| --- | --- | --- |
+| `health_check` | System | Health check endpoint for container monitoring and status verification |
+| `execute_query` | Query | Execute a PromQL instant query against Prometheus |
+| `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
+| `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
+| `get_metric_metadata` | Discovery | Get metadata for a specific metric |
+| `get_targets` | Discovery | Get information about all scrape targets |
+
+The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
+
+## Features
+
+- Execute PromQL queries against Prometheus
+- Discover and explore metrics
+  - List available metrics
+  - Get metadata for specific metrics
+  - View instant query results
+  - View range query results with different step intervals
+- Authentication support
+  - Basic auth from environment variables
+  - Bearer token auth from environment variables
+- Docker containerization support
+- Provide interactive tools for AI assistants
+
 ## Development
 
 Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for detailed information on how to get started, coding standards, and the pull request process.
@@ -193,21 +203,8 @@ pytest --cov=src --cov-report=term-missing
 
 When adding new features, please also add corresponding tests.
 
-### Tools
-
-| Tool | Category | Description |
-| --- | --- | --- |
-| `health_check` | System | Health check endpoint for container monitoring and status verification |
-| `execute_query` | Query | Execute a PromQL instant query against Prometheus |
-| `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
-| `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
-| `get_metric_metadata` | Discovery | Get metadata for a specific metric |
-| `get_targets` | Discovery | Get information about all scrape targets |
-
 ## License
 
 MIT
 
 ---
-
-[mcp]: https://modelcontextprotocol.io
