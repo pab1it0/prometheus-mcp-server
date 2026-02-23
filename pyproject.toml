@@ -11,7 +11,7 @@ dependencies = [
     "pyproject-toml>=0.1.0",
     "requests",
     "structlog>=23.0.0",
-    "fastmcp>=2.11.3,<3.0.0",
+    "fastmcp>=2.11.3,<4.0.0",
 ]
 
 [project.optional-dependencies]
