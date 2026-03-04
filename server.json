@@ -67,6 +67,20 @@
           "isSecret": false
         },
         {
+          "name": "PROMETHEUS_CLIENT_CERT",
+          "description": "Path to client certificate file for mutual TLS authentication",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_CLIENT_KEY",
+          "description": "Path to client private key file for mutual TLS authentication",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
           "name": "PROMETHEUS_MCP_SERVER_TRANSPORT",
           "description": "MCP server transport type (stdio, http, or sse)",
           "isRequired": false,
