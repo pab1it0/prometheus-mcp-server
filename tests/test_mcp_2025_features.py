@@ -17,7 +17,8 @@ from prometheus_mcp_server.server import (
     mcp,
     get_cached_metrics,
     _metrics_cache,
-    _CACHE_TTL
+    _CACHE_TTL,
+    clear_metrics_cache
 )
 
 
@@ -178,8 +179,7 @@ class TestProgressNotifications:
     async def test_list_metrics_with_progress_works(self, mock_make_request):
         """Verify list_metrics works with progress support."""
         # Clear cache so the mock is actually called
-        _metrics_cache["data"] = None
-        _metrics_cache["timestamp"] = 0
+        clear_metrics_cache()
         mock_make_request.return_value = ["metric1", "metric2", "metric3"]
 
         async with Client(mcp) as client:
@@ -308,8 +308,7 @@ class TestMetricsCaching:
     def test_get_cached_metrics_returns_list(self):
         """Verify get_cached_metrics returns a list of metrics."""
         with patch("prometheus_mcp_server.server.make_prometheus_request") as mock_request:
-            _metrics_cache["data"] = None
-            _metrics_cache["timestamp"] = 0
+            clear_metrics_cache()
             mock_request.return_value = ["metric1", "metric2", "metric3"]
 
             result = get_cached_metrics()
@@ -324,8 +323,7 @@ class TestMetricsCaching:
             mock_request.return_value = ["metric1", "metric2"]
 
             # Clear cache
-            _metrics_cache["data"] = None
-            _metrics_cache["timestamp"] = 0
+            clear_metrics_cache()
 
             # First call should fetch from Prometheus
             result1 = get_cached_metrics()
@@ -344,8 +342,7 @@ class TestMetricsCaching:
                 mock_request.return_value = ["metric1", "metric2"]
 
                 # Clear cache
-                _metrics_cache["data"] = None
-                _metrics_cache["timestamp"] = 0
+                clear_metrics_cache()
 
                 # First call at time 0
                 mock_time.time.return_value = 0
@@ -373,8 +370,7 @@ class TestMetricsCaching:
         with patch("prometheus_mcp_server.server.make_prometheus_request") as mock_request:
             # First successful call
             mock_request.return_value = ["metric1", "metric2"]
-            _metrics_cache["data"] = None
-            _metrics_cache["timestamp"] = 0
+            clear_metrics_cache()
 
             result1 = get_cached_metrics()
             assert len(result1) == 2

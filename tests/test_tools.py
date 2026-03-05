@@ -7,9 +7,16 @@ from unittest.mock import patch, MagicMock
 from fastmcp import Client
 from prometheus_mcp_server.server import (
     mcp, execute_query, execute_range_query, list_metrics, get_metric_metadata, get_targets,
-    _metrics_cache,
+    _metrics_cache, clear_metrics_cache,
     _coerce_metadata_entries, _normalize_metadata_map, _metadata_matches_pattern,
 )
+
+@pytest.fixture(autouse=True)
+def reset_metrics_cache():
+    """Reset metrics cache before each test to prevent state leaking."""
+    clear_metrics_cache()
+    yield
+    clear_metrics_cache()
 
 @pytest.fixture
 def mock_make_request():
