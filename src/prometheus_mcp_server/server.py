@@ -249,16 +249,11 @@ def get_cached_metrics() -> List[str]:
         return _metrics_cache["data"]
 
     # Fetch fresh metrics
-    try:
-        data = make_prometheus_request("label/__name__/values")
-        _metrics_cache["data"] = data
-        _metrics_cache["timestamp"] = current_time
-        logger.debug("Refreshed metrics cache", metric_count=len(data))
-        return data
-    except Exception as e:
-        logger.error("Failed to fetch metrics for cache", error=str(e))
-        # Return cached data if available, even if expired
-        return _metrics_cache["data"] if _metrics_cache["data"] is not None else []
+    data = make_prometheus_request("label/__name__/values")
+    _metrics_cache["data"] = data
+    _metrics_cache["timestamp"] = current_time
+    logger.debug("Refreshed metrics cache", metric_count=len(data))
+    return data
 
 # Note: Argument completions will be added when FastMCP supports the completion
 # capability. The get_cached_metrics() function above is ready for that integration.

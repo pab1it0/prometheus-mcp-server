@@ -58,24 +58,12 @@ class TestGetCachedMetrics:
         mock_make_request.assert_called_once_with("label/__name__/values")
         assert result == ["fresh_metric"]
 
-    def test_returns_stale_cache_on_failure(self, mock_make_request):
-        """On fetch failure, should return stale cached data."""
-        _metrics_cache["data"] = ["stale_metric"]
-        _metrics_cache["timestamp"] = time.time() - _CACHE_TTL - 1
-
+    def test_propagates_errors_on_fetch_failure(self, mock_make_request):
+        """On fetch failure, should propagate the exception."""
         mock_make_request.side_effect = Exception("connection refused")
 
-        result = get_cached_metrics()
-
-        assert result == ["stale_metric"]
-
-    def test_returns_empty_list_on_failure_with_no_cache(self, mock_make_request):
-        """On fetch failure with no cached data, should return empty list."""
-        mock_make_request.side_effect = Exception("connection refused")
-
-        result = get_cached_metrics()
-
-        assert result == []
+        with pytest.raises(Exception, match="connection refused"):
+            get_cached_metrics()
 
 
 @pytest.mark.asyncio
@@ -219,34 +207,44 @@ async def test_list_metrics_with_filter(mock_get_cached_metrics):
         assert result.data["has_more"] == False
 
 @pytest.mark.asyncio
-async def test_list_metrics_refresh_cache(mock_make_request, mock_get_cached_metrics):
+async def test_list_metrics_refresh_cache(mock_get_cached_metrics):
     """Test that refresh_cache=True invalidates the cache before fetching."""
     # Pre-populate cache to simulate a warm cache
     _metrics_cache["data"] = ["old_metric"]
     _metrics_cache["timestamp"] = time.time()
 
-    mock_get_cached_metrics.return_value = ["new_metric"]
+    cache_state_at_call = {}
+    def capture_cache_state():
+        cache_state_at_call["data"] = _metrics_cache["data"]
+        cache_state_at_call["timestamp"] = _metrics_cache["timestamp"]
+        return ["new_metric"]
+
+    mock_get_cached_metrics.side_effect = lambda: capture_cache_state()
 
     async with Client(mcp) as client:
         result = await client.call_tool("list_metrics", {"refresh_cache": True})
 
-        # Cache should have been invalidated before get_cached_metrics was called
         mock_get_cached_metrics.assert_called_once()
+        # Verify the cache was cleared before get_cached_metrics was called
+        assert cache_state_at_call["data"] is None
+        assert cache_state_at_call["timestamp"] == 0
         assert result.data["metrics"] == ["new_metric"]
 
 @pytest.mark.asyncio
 async def test_list_metrics_no_refresh_by_default(mock_get_cached_metrics):
     """Test that cache is not invalidated by default."""
     _metrics_cache["data"] = ["cached_metric"]
-    _metrics_cache["timestamp"] = time.time()
+    original_timestamp = time.time()
+    _metrics_cache["timestamp"] = original_timestamp
 
     mock_get_cached_metrics.return_value = ["cached_metric"]
 
     async with Client(mcp) as client:
         result = await client.call_tool("list_metrics", {})
 
-        # Cache timestamp should not have been reset
-        assert _metrics_cache["timestamp"] > 0
+        # Cache should not have been reset
+        assert _metrics_cache["timestamp"] == original_timestamp
+        assert _metrics_cache["data"] == ["cached_metric"]
         assert result.data["metrics"] == ["cached_metric"]
 
 @pytest.mark.asyncio
