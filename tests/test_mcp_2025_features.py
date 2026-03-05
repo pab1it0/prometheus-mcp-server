@@ -177,6 +177,9 @@ class TestProgressNotifications:
     @pytest.mark.asyncio
     async def test_list_metrics_with_progress_works(self, mock_make_request):
         """Verify list_metrics works with progress support."""
+        # Clear cache so the mock is actually called
+        _metrics_cache["data"] = None
+        _metrics_cache["timestamp"] = 0
         mock_make_request.return_value = ["metric1", "metric2", "metric3"]
 
         async with Client(mcp) as client:
@@ -305,6 +308,8 @@ class TestMetricsCaching:
     def test_get_cached_metrics_returns_list(self):
         """Verify get_cached_metrics returns a list of metrics."""
         with patch("prometheus_mcp_server.server.make_prometheus_request") as mock_request:
+            _metrics_cache["data"] = None
+            _metrics_cache["timestamp"] = 0
             mock_request.return_value = ["metric1", "metric2", "metric3"]
 
             result = get_cached_metrics()
@@ -363,8 +368,8 @@ class TestMetricsCaching:
         """Verify cache TTL is set to 5 minutes (300 seconds)."""
         assert _CACHE_TTL == 300, "Cache TTL should be 5 minutes (300 seconds)"
 
-    def test_cache_handles_errors_gracefully(self):
-        """Verify cache returns stale data on error rather than failing."""
+    def test_cache_propagates_errors(self):
+        """Verify fetch errors propagate instead of being silently swallowed."""
         with patch("prometheus_mcp_server.server.make_prometheus_request") as mock_request:
             # First successful call
             mock_request.return_value = ["metric1", "metric2"]
@@ -378,22 +383,8 @@ class TestMetricsCaching:
             _metrics_cache["timestamp"] = 0
             mock_request.side_effect = Exception("Connection error")
 
-            # Should return stale cache data instead of raising
-            result2 = get_cached_metrics()
-            assert result2 == ["metric1", "metric2"], \
-                "Should return stale cache data on error"
-
-    def test_cache_returns_empty_list_when_no_data(self):
-        """Verify cache returns empty list when no data available."""
-        with patch("prometheus_mcp_server.server.make_prometheus_request") as mock_request:
-            mock_request.side_effect = Exception("Connection error")
-
-            # Clear cache completely
-            _metrics_cache["data"] = None
-            _metrics_cache["timestamp"] = 0
-
-            result = get_cached_metrics()
-            assert result == [], "Should return empty list when no data available"
+            with pytest.raises(Exception, match="Connection error"):
+                get_cached_metrics()
 
 
 class TestBackwardCompatibility:
