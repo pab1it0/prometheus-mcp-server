@@ -219,6 +219,37 @@ async def test_list_metrics_with_filter(mock_get_cached_metrics):
         assert result.data["has_more"] == False
 
 @pytest.mark.asyncio
+async def test_list_metrics_refresh_cache(mock_make_request, mock_get_cached_metrics):
+    """Test that refresh_cache=True invalidates the cache before fetching."""
+    # Pre-populate cache to simulate a warm cache
+    _metrics_cache["data"] = ["old_metric"]
+    _metrics_cache["timestamp"] = time.time()
+
+    mock_get_cached_metrics.return_value = ["new_metric"]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_metrics", {"refresh_cache": True})
+
+        # Cache should have been invalidated before get_cached_metrics was called
+        mock_get_cached_metrics.assert_called_once()
+        assert result.data["metrics"] == ["new_metric"]
+
+@pytest.mark.asyncio
+async def test_list_metrics_no_refresh_by_default(mock_get_cached_metrics):
+    """Test that cache is not invalidated by default."""
+    _metrics_cache["data"] = ["cached_metric"]
+    _metrics_cache["timestamp"] = time.time()
+
+    mock_get_cached_metrics.return_value = ["cached_metric"]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_metrics", {})
+
+        # Cache timestamp should not have been reset
+        assert _metrics_cache["timestamp"] > 0
+        assert result.data["metrics"] == ["cached_metric"]
+
+@pytest.mark.asyncio
 async def test_get_metric_metadata(mock_make_request):
     """Test the get_metric_metadata tool."""
     # Setup

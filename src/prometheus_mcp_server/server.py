@@ -406,6 +406,7 @@ async def list_metrics(
     limit: Optional[int] = None,
     offset: int = 0,
     filter_pattern: Optional[str] = None,
+    refresh_cache: bool = False,
     ctx: Context | None = None
 ) -> Dict[str, Any]:
     """Retrieve a list of all metric names available in Prometheus.
@@ -414,6 +415,7 @@ async def list_metrics(
         limit: Maximum number of metrics to return (default: all metrics)
         offset: Number of metrics to skip for pagination (default: 0)
         filter_pattern: Optional substring to filter metric names (case-insensitive)
+        refresh_cache: Force a cache refresh to pick up newly scraped metrics (default: False)
 
     Returns:
         Dictionary containing:
@@ -423,11 +425,15 @@ async def list_metrics(
         - offset: Current offset
         - has_more: Whether more metrics are available
     """
-    logger.info("Listing available metrics", limit=limit, offset=offset, filter_pattern=filter_pattern)
+    logger.info("Listing available metrics", limit=limit, offset=offset, filter_pattern=filter_pattern, refresh_cache=refresh_cache)
 
     # Report progress if context available
     if ctx:
         await ctx.report_progress(progress=0, total=100, message="Fetching metrics list...")
+
+    if refresh_cache:
+        _metrics_cache["data"] = None
+        _metrics_cache["timestamp"] = 0
 
     data = get_cached_metrics()
 
