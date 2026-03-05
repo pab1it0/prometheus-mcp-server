@@ -429,7 +429,7 @@ async def list_metrics(
     if ctx:
         await ctx.report_progress(progress=0, total=100, message="Fetching metrics list...")
 
-    data = make_prometheus_request("label/__name__/values")
+    data = get_cached_metrics()
 
     if ctx:
         await ctx.report_progress(progress=50, total=100, message=f"Processing {len(data)} metrics...")

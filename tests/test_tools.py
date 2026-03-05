@@ -2,10 +2,12 @@
 
 import pytest
 import json
+import time
 from unittest.mock import patch, MagicMock
 from fastmcp import Client
 from prometheus_mcp_server.server import (
     mcp, execute_query, execute_range_query, list_metrics, get_metric_metadata, get_targets,
+    get_cached_metrics, _metrics_cache, _CACHE_TTL,
     _coerce_metadata_entries, _normalize_metadata_map, _metadata_matches_pattern,
 )
 
@@ -14,6 +16,67 @@ def mock_make_request():
     """Mock the make_prometheus_request function."""
     with patch("prometheus_mcp_server.server.make_prometheus_request") as mock:
         yield mock
+
+class TestGetCachedMetrics:
+    """Tests for get_cached_metrics caching behavior."""
+
+    def setup_method(self):
+        """Reset cache before each test."""
+        _metrics_cache["data"] = None
+        _metrics_cache["timestamp"] = 0
+
+    def test_fetches_on_empty_cache(self, mock_make_request):
+        """First call should hit Prometheus and populate the cache."""
+        mock_make_request.return_value = ["up", "go_goroutines"]
+
+        result = get_cached_metrics()
+
+        mock_make_request.assert_called_once_with("label/__name__/values")
+        assert result == ["up", "go_goroutines"]
+        assert _metrics_cache["data"] == ["up", "go_goroutines"]
+        assert _metrics_cache["timestamp"] > 0
+
+    def test_returns_cached_data_within_ttl(self, mock_make_request):
+        """Subsequent calls within TTL should not hit Prometheus."""
+        _metrics_cache["data"] = ["cached_metric"]
+        _metrics_cache["timestamp"] = time.time()
+
+        result = get_cached_metrics()
+
+        mock_make_request.assert_not_called()
+        assert result == ["cached_metric"]
+
+    def test_refreshes_after_ttl_expires(self, mock_make_request):
+        """Calls after TTL should fetch fresh data."""
+        _metrics_cache["data"] = ["stale_metric"]
+        _metrics_cache["timestamp"] = time.time() - _CACHE_TTL - 1
+
+        mock_make_request.return_value = ["fresh_metric"]
+
+        result = get_cached_metrics()
+
+        mock_make_request.assert_called_once_with("label/__name__/values")
+        assert result == ["fresh_metric"]
+
+    def test_returns_stale_cache_on_failure(self, mock_make_request):
+        """On fetch failure, should return stale cached data."""
+        _metrics_cache["data"] = ["stale_metric"]
+        _metrics_cache["timestamp"] = time.time() - _CACHE_TTL - 1
+
+        mock_make_request.side_effect = Exception("connection refused")
+
+        result = get_cached_metrics()
+
+        assert result == ["stale_metric"]
+
+    def test_returns_empty_list_on_failure_with_no_cache(self, mock_make_request):
+        """On fetch failure with no cached data, should return empty list."""
+        mock_make_request.side_effect = Exception("connection refused")
+
+        result = get_cached_metrics()
+
+        assert result == []
+
 
 @pytest.mark.asyncio
 async def test_execute_query(mock_make_request):
@@ -94,18 +157,24 @@ async def test_execute_range_query(mock_make_request):
         assert len(result.data["links"]) > 0
         assert result.data["links"][0]["rel"] == "prometheus-ui"
 
+@pytest.fixture
+def mock_get_cached_metrics():
+    """Mock the get_cached_metrics function."""
+    with patch("prometheus_mcp_server.server.get_cached_metrics") as mock:
+        yield mock
+
 @pytest.mark.asyncio
-async def test_list_metrics(mock_make_request):
+async def test_list_metrics(mock_get_cached_metrics):
     """Test the list_metrics tool."""
     # Setup
-    mock_make_request.return_value = ["up", "go_goroutines", "http_requests_total"]
+    mock_get_cached_metrics.return_value = ["up", "go_goroutines", "http_requests_total"]
 
     async with Client(mcp) as client:
         # Execute - call without pagination
         result = await client.call_tool("list_metrics", {})
 
         # Verify
-        mock_make_request.assert_called_once_with("label/__name__/values")
+        mock_get_cached_metrics.assert_called_once()
         # Now returns a dict with pagination info
         assert result.data["metrics"] == ["up", "go_goroutines", "http_requests_total"]
         assert result.data["total_count"] == 3
@@ -114,17 +183,17 @@ async def test_list_metrics(mock_make_request):
         assert result.data["has_more"] == False
 
 @pytest.mark.asyncio
-async def test_list_metrics_with_pagination(mock_make_request):
+async def test_list_metrics_with_pagination(mock_get_cached_metrics):
     """Test the list_metrics tool with pagination."""
     # Setup
-    mock_make_request.return_value = ["metric1", "metric2", "metric3", "metric4", "metric5"]
+    mock_get_cached_metrics.return_value = ["metric1", "metric2", "metric3", "metric4", "metric5"]
 
     async with Client(mcp) as client:
         # Execute - call with limit and offset
         result = await client.call_tool("list_metrics", {"limit": 2, "offset": 1})
 
         # Verify
-        mock_make_request.assert_called_once_with("label/__name__/values")
+        mock_get_cached_metrics.assert_called_once()
         assert result.data["metrics"] == ["metric2", "metric3"]
         assert result.data["total_count"] == 5
         assert result.data["returned_count"] == 2
@@ -132,17 +201,17 @@ async def test_list_metrics_with_pagination(mock_make_request):
         assert result.data["has_more"] == True
 
 @pytest.mark.asyncio
-async def test_list_metrics_with_filter(mock_make_request):
+async def test_list_metrics_with_filter(mock_get_cached_metrics):
     """Test the list_metrics tool with filter pattern."""
     # Setup
-    mock_make_request.return_value = ["http_requests_total", "http_response_size", "go_goroutines", "up"]
+    mock_get_cached_metrics.return_value = ["http_requests_total", "http_response_size", "go_goroutines", "up"]
 
     async with Client(mcp) as client:
         # Execute - call with filter
         result = await client.call_tool("list_metrics", {"filter_pattern": "http"})
 
         # Verify
-        mock_make_request.assert_called_once_with("label/__name__/values")
+        mock_get_cached_metrics.assert_called_once()
         assert result.data["metrics"] == ["http_requests_total", "http_response_size"]
         assert result.data["total_count"] == 2
         assert result.data["returned_count"] == 2
