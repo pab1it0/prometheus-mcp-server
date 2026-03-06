@@ -444,9 +444,7 @@ class TestMCPProtocolVersioning:
         ]
         
         for tool in tools:
-            # Each tool should have a description (FastMCP tools have description attribute)
-            assert hasattr(tool, 'description')
-            assert tool.description is not None and tool.description.strip() != ""
+            assert tool.__doc__ is not None and tool.__doc__.strip() != ""
     
     def test_server_capabilities(self):
         """Test server declares proper MCP capabilities."""

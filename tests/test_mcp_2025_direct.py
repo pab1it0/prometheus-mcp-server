@@ -37,8 +37,7 @@ class TestDirectFunctionCalls:
             "result": [{"metric": {"__name__": "up"}, "value": [1617898448.214, "1"]}]
         }
 
-        # Access the underlying function from FunctionTool
-        result = await execute_query.fn(query="up", time="2023-01-01T00:00:00Z")
+        result = await execute_query(query="up", time="2023-01-01T00:00:00Z")
 
         assert "resultType" in result
         assert "result" in result
@@ -58,7 +57,7 @@ class TestDirectFunctionCalls:
         mock_ctx = AsyncMock()
         mock_ctx.report_progress = AsyncMock()
 
-        result = await execute_range_query.fn(
+        result = await execute_range_query(
             query="up",
             start="2023-01-01T00:00:00Z",
             end="2023-01-01T01:00:00Z",
@@ -93,7 +92,7 @@ class TestDirectFunctionCalls:
         }
 
         # Call without context - should not error
-        result = await execute_range_query.fn(
+        result = await execute_range_query(
             query="up",
             start="2023-01-01T00:00:00Z",
             end="2023-01-01T01:00:00Z",
@@ -113,7 +112,7 @@ class TestDirectFunctionCalls:
         mock_ctx = AsyncMock()
         mock_ctx.report_progress = AsyncMock()
 
-        result = await list_metrics.fn(ctx=mock_ctx)
+        result = await list_metrics(ctx=mock_ctx)
 
         # Verify progress was reported (now expects 3 calls: start, processing, completion)
         assert mock_ctx.report_progress.call_count >= 2
@@ -140,7 +139,7 @@ class TestDirectFunctionCalls:
         """Test list_metrics without context (backward compatibility)."""
         mock_make_request.return_value = ["metric1", "metric2"]
 
-        result = await list_metrics.fn(ctx=None)
+        result = await list_metrics(ctx=None)
 
         # Now returns a dict with pagination info
         assert isinstance(result, dict)
@@ -158,7 +157,7 @@ class TestDirectFunctionCalls:
             ]
         }
 
-        result = await get_metric_metadata.fn(metric="up")
+        result = await get_metric_metadata(metric="up")
 
         assert len(result) == 1
         assert result[0]["metric"] == "up"
@@ -174,7 +173,7 @@ class TestDirectFunctionCalls:
             ]
         }
 
-        result = await get_metric_metadata.fn(metric="http_requests")
+        result = await get_metric_metadata(metric="http_requests")
 
         assert len(result) == 1
         assert result[0]["metric"] == "http_requests"
@@ -188,7 +187,7 @@ class TestDirectFunctionCalls:
             {"metric": "cpu_usage", "type": "gauge", "help": "CPU usage", "unit": "percent"}
         ]
 
-        result = await get_metric_metadata.fn(metric="cpu_usage")
+        result = await get_metric_metadata(metric="cpu_usage")
 
         assert len(result) == 1
         assert result[0]["metric"] == "cpu_usage"
@@ -202,7 +201,7 @@ class TestDirectFunctionCalls:
             "metadata": {"metric": "memory_usage", "type": "gauge", "help": "Memory usage", "unit": "bytes"}
         }
 
-        result = await get_metric_metadata.fn(metric="memory_usage")
+        result = await get_metric_metadata(metric="memory_usage")
 
         assert isinstance(result, list)
         assert len(result) == 1
@@ -217,7 +216,7 @@ class TestDirectFunctionCalls:
             "data": {"metric": "disk_usage", "type": "gauge", "help": "Disk usage", "unit": "bytes"}
         }
 
-        result = await get_metric_metadata.fn(metric="disk_usage")
+        result = await get_metric_metadata(metric="disk_usage")
 
         assert isinstance(result, list)
         assert len(result) == 1
@@ -232,7 +231,7 @@ class TestDirectFunctionCalls:
             "metric": "network_bytes", "type": "counter", "help": "Network bytes", "unit": "bytes"
         }
 
-        result = await get_metric_metadata.fn(metric="network_bytes")
+        result = await get_metric_metadata(metric="network_bytes")
 
         assert isinstance(result, list)
         assert len(result) == 1
@@ -257,7 +256,7 @@ class TestDirectFunctionCalls:
             ]
         }
 
-        result = await get_targets.fn()
+        result = await get_targets()
 
         assert "activeTargets" in result
         assert "droppedTargets" in result
@@ -285,7 +284,7 @@ class TestHealthCheckFunction:
             mock_config.mcp_server_config = MagicMock()
             mock_config.mcp_server_config.mcp_server_transport = "stdio"
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["status"] == "healthy"
             assert result["service"] == "prometheus-mcp-server"
@@ -310,7 +309,7 @@ class TestHealthCheckFunction:
             mock_config.mcp_server_config = MagicMock()
             mock_config.mcp_server_config.mcp_server_transport = "http"
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["status"] == "degraded"
             assert result["prometheus_connectivity"] == "unhealthy"
@@ -329,7 +328,7 @@ class TestHealthCheckFunction:
             mock_config.mcp_server_config = MagicMock()
             mock_config.mcp_server_config.mcp_server_transport = "stdio"
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["status"] == "unhealthy"
             assert "error" in result
@@ -353,7 +352,7 @@ class TestHealthCheckFunction:
             mock_config.mcp_server_config = MagicMock()
             mock_config.mcp_server_config.mcp_server_transport = "sse"
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["status"] == "healthy"
             assert result["configuration"]["authentication_configured"] is True
@@ -367,7 +366,7 @@ class TestHealthCheckFunction:
             # Make accessing config.url raise an exception
             type(mock_config).url = property(lambda self: (_ for _ in ()).throw(RuntimeError("Unexpected error")))
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["status"] == "unhealthy"
             assert "error" in result
@@ -390,7 +389,7 @@ class TestHealthCheckFunction:
             mock_config.mcp_server_config = MagicMock()
             mock_config.mcp_server_config.mcp_server_transport = "stdio"
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["configuration"]["org_id_configured"] is True
 
@@ -410,7 +409,7 @@ class TestHealthCheckFunction:
             mock_config.org_id = None
             mock_config.mcp_server_config = None
 
-            result = await health_check.fn()
+            result = await health_check()
 
             assert result["status"] == "healthy"
             assert result["transport"] == "stdio"
@@ -430,7 +429,7 @@ class TestProgressNotificationsPaths:
         mock_ctx = AsyncMock()
         mock_ctx.report_progress = AsyncMock()
 
-        await execute_range_query.fn(
+        await execute_range_query(
             query="up",
             start="2023-01-01T00:00:00Z",
             end="2023-01-01T01:00:00Z",
@@ -458,7 +457,7 @@ class TestProgressNotificationsPaths:
         mock_ctx = AsyncMock()
         mock_ctx.report_progress = AsyncMock()
 
-        await list_metrics.fn(ctx=mock_ctx)
+        await list_metrics(ctx=mock_ctx)
 
         calls = [call.kwargs for call in mock_ctx.report_progress.call_args_list]
 
