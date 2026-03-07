@@ -107,6 +107,20 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+        {
+          "name": "TOOL_PREFIX",
+          "description": "Prefix for all tool names, useful when connecting multiple Prometheus instances (e.g., 'staging' results in 'staging_execute_query')",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_REQUEST_TIMEOUT",
+          "description": "Request timeout in seconds for Prometheus API calls (default: 30)",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false
         }
       ]
     }
