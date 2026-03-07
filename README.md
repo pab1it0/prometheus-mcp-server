@@ -1,6 +1,7 @@
 # Prometheus MCP Server
 
 [![GitHub Container Registry](https://img.shields.io/badge/ghcr.io-pab1it0%2Fprometheus--mcp--server-blue?logo=docker)](https://github.com/users/pab1it0/packages/container/package/prometheus-mcp-server)
+[![Helm Chart](https://img.shields.io/badge/helm%20chart-ghcr.io-blue?logo=helm)](https://github.com/pab1it0/prometheus-mcp-server/pkgs/container/charts%2Fprometheus-mcp-server)
 [![GitHub Release](https://img.shields.io/github/v/release/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/releases)
 [![Codecov](https://codecov.io/gh/pab1it0/prometheus-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/pab1it0/prometheus-mcp-server)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -118,6 +119,41 @@ docker run -i --rm \
   -e PROMETHEUS_PASSWORD="password" \
   ghcr.io/pab1it0/prometheus-mcp-server:latest
 ```
+</details>
+
+<details>
+<summary><b>Helm Chart (Kubernetes)</b></summary>
+
+Deploy to Kubernetes using the Helm chart from the OCI registry:
+
+```bash
+helm install prometheus-mcp-server \
+  oci://ghcr.io/pab1it0/charts/prometheus-mcp-server \
+  --version 1.0.0 \
+  --set prometheus.url="http://prometheus:9090"
+```
+
+With authentication:
+
+```bash
+helm install prometheus-mcp-server \
+  oci://ghcr.io/pab1it0/charts/prometheus-mcp-server \
+  --version 1.0.0 \
+  --set prometheus.url="http://prometheus:9090" \
+  --set auth.username="admin" \
+  --set auth.password="secret"
+```
+
+With a custom values file:
+
+```bash
+helm install prometheus-mcp-server \
+  oci://ghcr.io/pab1it0/charts/prometheus-mcp-server \
+  --version 1.0.0 \
+  -f values.yaml
+```
+
+See the [chart values](charts/prometheus-mcp-server/values.yaml) for all available configuration options.
 </details>
 
 ### Configuration Options
