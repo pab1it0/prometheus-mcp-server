@@ -52,7 +52,7 @@ async def health_check_wrapper():
             "transport": config.mcp_server_config.mcp_server_transport if config.mcp_server_config else "stdio",
             "configuration": {
                 "prometheus_url_configured": bool(config.url),
-                "authentication_configured": bool(config.username or config.token),
+                "authentication_configured": bool(config.username or config.token or config.client_cert),
                 "org_id_configured": bool(config.org_id)
             }
         }

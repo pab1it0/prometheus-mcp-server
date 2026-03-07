@@ -131,6 +131,9 @@ docker run -i --rm \
 | `PROMETHEUS_USERNAME` | Username for basic authentication | No |
 | `PROMETHEUS_PASSWORD` | Password for basic authentication | No |
 | `PROMETHEUS_TOKEN` | Bearer token for authentication | No |
+| `PROMETHEUS_CLIENT_CERT` | Path to client certificate file for mutual TLS authentication | No |
+| `PROMETHEUS_CLIENT_KEY` | Path to client private key file for mutual TLS authentication | No |
+| `REQUESTS_CA_BUNDLE` | Path to CA bundle file for verifying the server's TLS certificate (standard `requests` library env var) | No |
 | `ORG_ID` | Organization ID for multi-tenant setups | No |
 | `PROMETHEUS_MCP_SERVER_TRANSPORT` | Transport mode (stdio, http, sse) | No (default: stdio) |
 | `PROMETHEUS_MCP_BIND_HOST` | Host for HTTP transport | No (default: 127.0.0.1) |

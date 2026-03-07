@@ -61,7 +61,7 @@ async def health_check() -> Dict[str, Any]:
             "transport": config.mcp_server_config.mcp_server_transport if config.mcp_server_config else "stdio",
             "configuration": {
                 "prometheus_url_configured": bool(config.url),
-                "authentication_configured": bool(config.username or config.token),
+                "authentication_configured": bool(config.username or config.token or config.client_cert),
                 "org_id_configured": bool(config.org_id)
             }
         }
@@ -133,6 +133,9 @@ class PrometheusConfig:
     token: Optional[str] = None
     # Optional Org ID for multi-tenant setups
     org_id: Optional[str] = None
+    # Optional client TLS certificate for mutual TLS authentication
+    client_cert: Optional[str] = None
+    client_key: Optional[str] = None
     # Optional Custom MCP Server Configuration
     mcp_server_config: Optional[MCPServerConfig] = None
     # Optional custom headers for Prometheus requests
@@ -153,6 +156,8 @@ config = PrometheusConfig(
         mcp_bind_host=os.environ.get("PROMETHEUS_MCP_BIND_HOST", "127.0.0.1"),
         mcp_bind_port=int(os.environ.get("PROMETHEUS_MCP_BIND_PORT", "8080"))
     ),
+    client_cert=os.environ.get("PROMETHEUS_CLIENT_CERT", "") or None,
+    client_key=os.environ.get("PROMETHEUS_CLIENT_KEY", "") or None,
     custom_headers=json.loads(os.environ.get("PROMETHEUS_CUSTOM_HEADERS")) if os.environ.get("PROMETHEUS_CUSTOM_HEADERS") else None,
     request_timeout=int(os.environ.get("PROMETHEUS_REQUEST_TIMEOUT", "30")),
 )
@@ -189,11 +194,19 @@ def make_prometheus_request(endpoint, params=None):
     if config.custom_headers:
         headers.update(config.custom_headers)
 
+    # Build client certificate tuple for mutual TLS authentication
+    client_cert = None
+    if config.client_cert:
+        if config.client_key:
+            client_cert = (config.client_cert, config.client_key)
+        else:
+            client_cert = config.client_cert
+
     try:
         logger.debug("Making Prometheus API request", endpoint=endpoint, url=url, params=params, headers=headers, timeout=config.request_timeout)
 
         # Make the request with appropriate headers, auth, and timeout (DDoS protection)
-        response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify, timeout=config.request_timeout)
+        response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify, cert=client_cert, timeout=config.request_timeout)
 
         response.raise_for_status()
         result = response.json()

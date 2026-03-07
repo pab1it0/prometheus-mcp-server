@@ -274,6 +274,78 @@ def test_make_prometheus_request_ssl_verify_false(mock_get, mock_response):
     assert result == {"resultType": "vector", "result": []}
 
 @patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_client_cert_and_key(mock_get, mock_response):
+    """Test making a request with client certificate and key for mutual TLS."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "https://test:9090"
+    original_client_cert = config.client_cert
+    original_client_key = config.client_key
+    config.client_cert = "/path/to/client.crt"
+    config.client_key = "/path/to/client.key"
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    call_kwargs = mock_get.call_args[1]
+    assert call_kwargs["cert"] == ("/path/to/client.crt", "/path/to/client.key")
+    assert result == {"resultType": "vector", "result": []}
+
+    # Cleanup
+    config.client_cert = original_client_cert
+    config.client_key = original_client_key
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_client_cert_only(mock_get, mock_response):
+    """Test making a request with only client certificate (combined PEM)."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "https://test:9090"
+    original_client_cert = config.client_cert
+    original_client_key = config.client_key
+    config.client_cert = "/path/to/client.pem"
+    config.client_key = None
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    call_kwargs = mock_get.call_args[1]
+    assert call_kwargs["cert"] == "/path/to/client.pem"
+    assert result == {"resultType": "vector", "result": []}
+
+    # Cleanup
+    config.client_cert = original_client_cert
+    config.client_key = original_client_key
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_no_client_cert(mock_get, mock_response):
+    """Test making a request without client certificate passes None."""
+    # Setup
+    mock_get.return_value = mock_response
+    config.url = "https://test:9090"
+    original_client_cert = config.client_cert
+    original_client_key = config.client_key
+    config.client_cert = None
+    config.client_key = None
+
+    # Execute
+    result = make_prometheus_request("query", {"query": "up"})
+
+    # Verify
+    mock_get.assert_called_once()
+    call_kwargs = mock_get.call_args[1]
+    assert call_kwargs["cert"] is None
+    assert result == {"resultType": "vector", "result": []}
+
+    # Cleanup
+    config.client_cert = original_client_cert
+    config.client_key = original_client_key
+
+@patch("prometheus_mcp_server.server.requests.get")
 def test_make_prometheus_request_with_custom_headers(mock_get, mock_response):
     """Test making a request with custom headers."""
     # Setup
