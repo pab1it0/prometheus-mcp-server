@@ -1,0 +1,63 @@
+replicaCount: 2
+
+prometheus:
+  url: "https://prometheus.example.com"
+  sslVerify: "false"
+  disableLinks: "true"
+  requestTimeout: "60"
+  customHeaders: '{"X-Custom": "value"}'
+
+auth:
+  username: "admin"
+  password: "secret"
+  orgId: "tenant-1"
+
+mcp:
+  transport: "http"
+  toolPrefix: "staging"
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: mcp-tls
+      hosts:
+        - mcp.example.com
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: prometheus
+  interval: "30s"
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::role/test"
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+podAnnotations:
+  app.kubernetes.io/component: mcp-server
+
+nodeSelector:
+  kubernetes.io/os: linux

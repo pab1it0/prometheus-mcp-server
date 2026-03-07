@@ -1,0 +1,139 @@
+{{- if not .Values.prometheus.url -}}
+{{- fail "prometheus.url is required and must not be empty" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "prometheus-mcp-server.fullname" . }}
+  labels:
+    {{- include "prometheus-mcp-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "prometheus-mcp-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "prometheus-mcp-server.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "prometheus-mcp-server.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PROMETHEUS_URL
+              value: {{ .Values.prometheus.url | quote }}
+            - name: PROMETHEUS_MCP_SERVER_TRANSPORT
+              value: {{ .Values.mcp.transport | quote }}
+            - name: PROMETHEUS_MCP_BIND_HOST
+              value: {{ .Values.mcp.bindHost | quote }}
+            - name: PROMETHEUS_MCP_BIND_PORT
+              value: {{ .Values.containerPort | quote }}
+            - name: PROMETHEUS_URL_SSL_VERIFY
+              value: {{ .Values.prometheus.sslVerify | quote }}
+            - name: PROMETHEUS_DISABLE_LINKS
+              value: {{ .Values.prometheus.disableLinks | quote }}
+            - name: PROMETHEUS_REQUEST_TIMEOUT
+              value: {{ .Values.prometheus.requestTimeout | quote }}
+            {{- if .Values.prometheus.customHeaders }}
+            - name: PROMETHEUS_CUSTOM_HEADERS
+              value: {{ .Values.prometheus.customHeaders | quote }}
+            {{- end }}
+            {{- if .Values.mcp.toolPrefix }}
+            - name: TOOL_PREFIX
+              value: {{ .Values.mcp.toolPrefix | quote }}
+            {{- end }}
+            {{- $authSecretName := .Values.auth.existingSecret | default (printf "%s-auth" (include "prometheus-mcp-server.fullname" .)) -}}
+            {{- $hasAuth := or .Values.auth.existingSecret (or .Values.auth.username .Values.auth.token .Values.auth.orgId) -}}
+            {{- if $hasAuth }}
+            {{- if or .Values.auth.existingSecret .Values.auth.username }}
+            - name: PROMETHEUS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $authSecretName }}
+                  key: PROMETHEUS_USERNAME
+                  optional: true
+            - name: PROMETHEUS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $authSecretName }}
+                  key: PROMETHEUS_PASSWORD
+                  optional: true
+            {{- end }}
+            {{- if or .Values.auth.existingSecret .Values.auth.token }}
+            - name: PROMETHEUS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $authSecretName }}
+                  key: PROMETHEUS_TOKEN
+                  optional: true
+            {{- end }}
+            {{- if or .Values.auth.existingSecret .Values.auth.orgId }}
+            - name: ORG_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $authSecretName }}
+                  key: ORG_ID
+                  optional: true
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
