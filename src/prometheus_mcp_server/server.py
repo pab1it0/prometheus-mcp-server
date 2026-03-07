@@ -248,7 +248,7 @@ def get_cached_metrics() -> List[str]:
     """
     current_time = time.time()
 
-    # Capture cached values into locals for a consistent read
+    # snapshot for clarity
     cached_data = _metrics_cache["data"]
     cached_timestamp = _metrics_cache["timestamp"]
 
