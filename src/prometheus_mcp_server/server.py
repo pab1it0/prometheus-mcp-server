@@ -30,6 +30,11 @@ mcp = FastMCP(mcp_name)
 _metrics_cache = {"data": None, "timestamp": 0}
 _CACHE_TTL = 300  # 5 minutes
 
+def clear_metrics_cache():
+    """Reset the metrics cache, forcing the next fetch to hit Prometheus."""
+    _metrics_cache["data"] = None
+    _metrics_cache["timestamp"] = 0
+
 # Get logger instance
 logger = get_logger()
 
@@ -243,22 +248,20 @@ def get_cached_metrics() -> List[str]:
     """
     current_time = time.time()
 
-    # Check if cache is valid
-    if _metrics_cache["data"] is not None and (current_time - _metrics_cache["timestamp"]) < _CACHE_TTL:
-        logger.debug("Using cached metrics list", cache_age=current_time - _metrics_cache["timestamp"])
-        return _metrics_cache["data"]
+    # snapshot for clarity
+    cached_data = _metrics_cache["data"]
+    cached_timestamp = _metrics_cache["timestamp"]
+
+    if cached_data is not None and (current_time - cached_timestamp) < _CACHE_TTL:
+        logger.debug("Using cached metrics list", cache_age=current_time - cached_timestamp)
+        return cached_data
 
     # Fetch fresh metrics
-    try:
-        data = make_prometheus_request("label/__name__/values")
-        _metrics_cache["data"] = data
-        _metrics_cache["timestamp"] = current_time
-        logger.debug("Refreshed metrics cache", metric_count=len(data))
-        return data
-    except Exception as e:
-        logger.error("Failed to fetch metrics for cache", error=str(e))
-        # Return cached data if available, even if expired
-        return _metrics_cache["data"] if _metrics_cache["data"] is not None else []
+    data = make_prometheus_request("label/__name__/values")
+    _metrics_cache["data"] = data
+    _metrics_cache["timestamp"] = current_time
+    logger.debug("Refreshed metrics cache", metric_count=len(data))
+    return data
 
 # Note: Argument completions will be added when FastMCP supports the completion
 # capability. The get_cached_metrics() function above is ready for that integration.
@@ -406,7 +409,8 @@ async def list_metrics(
     limit: Optional[int] = None,
     offset: int = 0,
     filter_pattern: Optional[str] = None,
-    ctx: Context | None = None
+    ctx: Context | None = None,
+    refresh_cache: bool = False,
 ) -> Dict[str, Any]:
     """Retrieve a list of all metric names available in Prometheus.
 
@@ -414,6 +418,7 @@ async def list_metrics(
         limit: Maximum number of metrics to return (default: all metrics)
         offset: Number of metrics to skip for pagination (default: 0)
         filter_pattern: Optional substring to filter metric names (case-insensitive)
+        refresh_cache: Force a cache refresh to pick up newly scraped metrics (default: False)
 
     Returns:
         Dictionary containing:
@@ -423,13 +428,16 @@ async def list_metrics(
         - offset: Current offset
         - has_more: Whether more metrics are available
     """
-    logger.info("Listing available metrics", limit=limit, offset=offset, filter_pattern=filter_pattern)
+    logger.info("Listing available metrics", limit=limit, offset=offset, filter_pattern=filter_pattern, refresh_cache=refresh_cache)
 
     # Report progress if context available
     if ctx:
         await ctx.report_progress(progress=0, total=100, message="Fetching metrics list...")
 
-    data = make_prometheus_request("label/__name__/values")
+    if refresh_cache:
+        clear_metrics_cache()
+
+    data = get_cached_metrics()
 
     if ctx:
         await ctx.report_progress(progress=50, total=100, message=f"Processing {len(data)} metrics...")

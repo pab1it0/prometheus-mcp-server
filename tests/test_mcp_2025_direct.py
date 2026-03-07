@@ -15,8 +15,17 @@ from prometheus_mcp_server.server import (
     get_metric_metadata,
     get_targets,
     health_check,
-    config
+    config,
+    clear_metrics_cache,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_metrics_cache():
+    """Reset metrics cache before each test to prevent state leaking."""
+    clear_metrics_cache()
+    yield
+    clear_metrics_cache()
 
 
 @pytest.fixture

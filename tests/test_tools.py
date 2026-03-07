@@ -2,12 +2,21 @@
 
 import pytest
 import json
+import time
 from unittest.mock import patch, MagicMock
 from fastmcp import Client
 from prometheus_mcp_server.server import (
     mcp, execute_query, execute_range_query, list_metrics, get_metric_metadata, get_targets,
+    _metrics_cache, clear_metrics_cache,
     _coerce_metadata_entries, _normalize_metadata_map, _metadata_matches_pattern,
 )
+
+@pytest.fixture(autouse=True)
+def reset_metrics_cache():
+    """Reset metrics cache before each test to prevent state leaking."""
+    clear_metrics_cache()
+    yield
+    clear_metrics_cache()
 
 @pytest.fixture
 def mock_make_request():
@@ -94,18 +103,24 @@ async def test_execute_range_query(mock_make_request):
         assert len(result.data["links"]) > 0
         assert result.data["links"][0]["rel"] == "prometheus-ui"
 
+@pytest.fixture
+def mock_get_cached_metrics():
+    """Mock the get_cached_metrics function."""
+    with patch("prometheus_mcp_server.server.get_cached_metrics") as mock:
+        yield mock
+
 @pytest.mark.asyncio
-async def test_list_metrics(mock_make_request):
+async def test_list_metrics(mock_get_cached_metrics):
     """Test the list_metrics tool."""
     # Setup
-    mock_make_request.return_value = ["up", "go_goroutines", "http_requests_total"]
+    mock_get_cached_metrics.return_value = ["up", "go_goroutines", "http_requests_total"]
 
     async with Client(mcp) as client:
         # Execute - call without pagination
         result = await client.call_tool("list_metrics", {})
 
         # Verify
-        mock_make_request.assert_called_once_with("label/__name__/values")
+        mock_get_cached_metrics.assert_called_once()
         # Now returns a dict with pagination info
         assert result.data["metrics"] == ["up", "go_goroutines", "http_requests_total"]
         assert result.data["total_count"] == 3
@@ -114,17 +129,17 @@ async def test_list_metrics(mock_make_request):
         assert result.data["has_more"] == False
 
 @pytest.mark.asyncio
-async def test_list_metrics_with_pagination(mock_make_request):
+async def test_list_metrics_with_pagination(mock_get_cached_metrics):
     """Test the list_metrics tool with pagination."""
     # Setup
-    mock_make_request.return_value = ["metric1", "metric2", "metric3", "metric4", "metric5"]
+    mock_get_cached_metrics.return_value = ["metric1", "metric2", "metric3", "metric4", "metric5"]
 
     async with Client(mcp) as client:
         # Execute - call with limit and offset
         result = await client.call_tool("list_metrics", {"limit": 2, "offset": 1})
 
         # Verify
-        mock_make_request.assert_called_once_with("label/__name__/values")
+        mock_get_cached_metrics.assert_called_once()
         assert result.data["metrics"] == ["metric2", "metric3"]
         assert result.data["total_count"] == 5
         assert result.data["returned_count"] == 2
@@ -132,22 +147,63 @@ async def test_list_metrics_with_pagination(mock_make_request):
         assert result.data["has_more"] == True
 
 @pytest.mark.asyncio
-async def test_list_metrics_with_filter(mock_make_request):
+async def test_list_metrics_with_filter(mock_get_cached_metrics):
     """Test the list_metrics tool with filter pattern."""
     # Setup
-    mock_make_request.return_value = ["http_requests_total", "http_response_size", "go_goroutines", "up"]
+    mock_get_cached_metrics.return_value = ["http_requests_total", "http_response_size", "go_goroutines", "up"]
 
     async with Client(mcp) as client:
         # Execute - call with filter
         result = await client.call_tool("list_metrics", {"filter_pattern": "http"})
 
         # Verify
-        mock_make_request.assert_called_once_with("label/__name__/values")
+        mock_get_cached_metrics.assert_called_once()
         assert result.data["metrics"] == ["http_requests_total", "http_response_size"]
         assert result.data["total_count"] == 2
         assert result.data["returned_count"] == 2
         assert result.data["offset"] == 0
         assert result.data["has_more"] == False
+
+@pytest.mark.asyncio
+async def test_list_metrics_refresh_cache(mock_get_cached_metrics):
+    """Test that refresh_cache=True invalidates the cache before fetching."""
+    # Pre-populate cache to simulate a warm cache
+    _metrics_cache["data"] = ["old_metric"]
+    _metrics_cache["timestamp"] = time.time()
+
+    cache_state_at_call = {}
+    def capture_cache_state():
+        cache_state_at_call["data"] = _metrics_cache["data"]
+        cache_state_at_call["timestamp"] = _metrics_cache["timestamp"]
+        return ["new_metric"]
+
+    mock_get_cached_metrics.side_effect = lambda: capture_cache_state()
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_metrics", {"refresh_cache": True})
+
+        mock_get_cached_metrics.assert_called_once()
+        # Verify the cache was cleared before get_cached_metrics was called
+        assert cache_state_at_call["data"] is None
+        assert cache_state_at_call["timestamp"] == 0
+        assert result.data["metrics"] == ["new_metric"]
+
+@pytest.mark.asyncio
+async def test_list_metrics_no_refresh_by_default(mock_get_cached_metrics):
+    """Test that cache is not invalidated by default."""
+    _metrics_cache["data"] = ["cached_metric"]
+    original_timestamp = time.time()
+    _metrics_cache["timestamp"] = original_timestamp
+
+    mock_get_cached_metrics.return_value = ["cached_metric"]
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("list_metrics", {})
+
+        # Cache should not have been reset
+        assert _metrics_cache["timestamp"] == original_timestamp
+        assert _metrics_cache["data"] == ["cached_metric"]
+        assert result.data["metrics"] == ["cached_metric"]
 
 @pytest.mark.asyncio
 async def test_get_metric_metadata(mock_make_request):
