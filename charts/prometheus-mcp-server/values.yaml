@@ -1,0 +1,131 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/pab1it0/prometheus-mcp-server
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+prometheus:
+  # URL of the Prometheus instance (required)
+  url: "http://prometheus:9090"
+  # Disable SSL verification
+  sslVerify: "true"
+  # Disable Prometheus UI links in responses (saves context tokens)
+  disableLinks: "false"
+  # Request timeout in seconds
+  requestTimeout: "30"
+  # Custom headers as JSON string
+  customHeaders: ""
+
+auth:
+  # Use an existing secret for auth credentials
+  existingSecret: ""
+  # Basic auth credentials
+  username: ""
+  password: ""
+  # Bearer token
+  token: ""
+  # Organization ID for multi-tenant setups (X-Scope-OrgID header)
+  orgId: ""
+
+mcp:
+  # Transport mode: http, sse, or stdio (use http or sse for Kubernetes)
+  transport: "http"
+  # Bind host
+  bindHost: "0.0.0.0"
+  # Tool name prefix
+  toolPrefix: ""
+
+containerPort: 8080
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+ingress:
+  enabled: false
+  ingressClassName: ""
+  annotations: {}
+  hosts:
+    - host: prometheus-mcp-server.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+serviceMonitor:
+  enabled: false
+  labels: {}
+  namespace: ""
+  interval: ""
+  scrapeTimeout: ""
+  namespaceSelector: {}
+  relabelings: []
+  metricRelabelings: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+resources: {}
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+
+test:
+  image:
+    repository: busybox
+    tag: "1.37"
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault

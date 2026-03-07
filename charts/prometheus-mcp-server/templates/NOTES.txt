@@ -1,0 +1,34 @@
+Prometheus MCP Server has been deployed.
+
+{{- if eq .Values.mcp.transport "stdio" }}
+
+WARNING: The server is configured with stdio transport mode.
+This is intended for local Claude Desktop integration, not Kubernetes deployments.
+Consider setting mcp.transport to "http" or "sse" for Kubernetes use.
+
+{{- else }}
+
+Transport: {{ .Values.mcp.transport }}
+Prometheus URL: {{ .Values.prometheus.url }}
+
+{{- if .Values.ingress.enabled }}
+
+The server is accessible via Ingress:
+{{- range .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ .path }}
+  {{- end }}
+{{- end }}
+
+{{- else }}
+
+To access the MCP server, use port-forward:
+
+  kubectl port-forward svc/{{ include "prometheus-mcp-server.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+
+The MCP endpoint will be available at:
+  http://127.0.0.1:{{ .Values.service.port }}/sse
+
+{{- end }}
+
+{{- end }}
