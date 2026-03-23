@@ -55,7 +55,3 @@ CLAUDE.md
 
 # Task planning files
 tasks/
-
-# Security scan results
-trivy*.json
-trivy-*.json
