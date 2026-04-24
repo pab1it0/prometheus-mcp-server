@@ -26,6 +26,13 @@ def _tool_name(name: str) -> str:
 mcp_name = f"Prometheus MCP ({TOOL_PREFIX})" if TOOL_PREFIX else "Prometheus MCP"
 mcp = FastMCP(mcp_name)
 
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_endpoint(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
 # Cache for metrics list to improve completion performance
 _metrics_cache = {"data": None, "timestamp": 0}
 _CACHE_TTL = 300  # 5 minutes
