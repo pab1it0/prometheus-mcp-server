@@ -37,6 +37,8 @@ mcp:
   transport: "http"
   # Bind host
   bindHost: "0.0.0.0"
+  # Enable stateless HTTP mode for multi-replica support
+  statelessHttp: false
   # Tool name prefix
   toolPrefix: ""
 

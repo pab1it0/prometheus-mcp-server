@@ -259,3 +259,37 @@ def test_run_server_sse_transport(mock_config, mock_run, mock_setup):
 
     # Verify
     mock_run.assert_called_once_with(transport="sse", host="0.0.0.0", port=9090)
+
+@patch("prometheus_mcp_server.main.setup_environment")
+@patch("prometheus_mcp_server.main.mcp.run")
+@patch("prometheus_mcp_server.main.config")
+def test_run_server_http_transport_stateless(mock_config, mock_run, mock_setup):
+    """Test server run with HTTP transport and stateless_http enabled."""
+    mock_setup.return_value = True
+    mock_config.mcp_server_config = MCPServerConfig(
+        mcp_server_transport="http",
+        mcp_bind_host="localhost",
+        mcp_bind_port=8080,
+        stateless_http=True
+    )
+
+    run_server()
+
+    mock_run.assert_called_once_with(transport="http", host="localhost", port=8080, stateless_http=True)
+
+@patch("prometheus_mcp_server.main.setup_environment")
+@patch("prometheus_mcp_server.main.mcp.run")
+@patch("prometheus_mcp_server.main.config")
+def test_run_server_http_transport_not_stateless(mock_config, mock_run, mock_setup):
+    """Test server run with HTTP transport and stateless_http disabled (default)."""
+    mock_setup.return_value = True
+    mock_config.mcp_server_config = MCPServerConfig(
+        mcp_server_transport="http",
+        mcp_bind_host="localhost",
+        mcp_bind_port=8080,
+        stateless_http=False
+    )
+
+    run_server()
+
+    mock_run.assert_called_once_with(transport="http", host="localhost", port=8080)

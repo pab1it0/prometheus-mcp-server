@@ -56,6 +56,10 @@ spec:
             - name: PROMETHEUS_CUSTOM_HEADERS
               value: {{ .Values.prometheus.customHeaders | quote }}
             {{- end }}
+            {{- if .Values.mcp.statelessHttp }}
+            - name: PROMETHEUS_MCP_STATELESS_HTTP
+              value: "true"
+            {{- end }}
             {{- if .Values.mcp.toolPrefix }}
             - name: TOOL_PREFIX
               value: {{ .Values.mcp.toolPrefix | quote }}

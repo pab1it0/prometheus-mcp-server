@@ -58,6 +58,7 @@ When `auth.existingSecret` is set, the chart expects the Secret to contain the k
 |-----------|-------------|---------|
 | `mcp.transport` | Transport mode: `http`, `sse`, or `stdio` | `"http"` |
 | `mcp.bindHost` | Bind address | `"0.0.0.0"` |
+| `mcp.statelessHttp` | Enable stateless HTTP mode for multi-replica support | `false` |
 | `mcp.toolPrefix` | Prefix for all MCP tool names (e.g., `staging`) | `""` |
 
 ### Deployment

@@ -14,6 +14,7 @@ auth:
 
 mcp:
   transport: "http"
+  statelessHttp: true
   toolPrefix: "staging"
 
 service:
