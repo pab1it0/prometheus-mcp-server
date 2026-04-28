@@ -576,3 +576,17 @@ def test_make_prometheus_request_with_all_headers_combined(mock_get, mock_respon
     config.org_id = original_org_id
     config.token = ""
 
+
+def test_health_endpoint_returns_ok():
+    """Test that the /health HTTP endpoint returns status ok."""
+    from prometheus_mcp_server.server import health_endpoint
+    from unittest.mock import MagicMock
+
+    mock_request = MagicMock()
+    response = asyncio.run(health_endpoint(mock_request))
+
+    assert response.status_code == 200
+    import json
+    body = json.loads(response.body)
+    assert body == {"status": "ok"}
+
