@@ -60,16 +60,22 @@ jobs:
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src/prometheus_mcp_server/server.py
           echo "Updated server.py with version $VERSION"
 
+      - name: Update Chart.yaml
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          sed -i "s/^appVersion: \"[^\"]*\"/appVersion: \"$VERSION\"/" charts/prometheus-mcp-server/Chart.yaml
+          echo "Updated Chart.yaml with appVersion $VERSION"
+
       - name: Check for changes
         id: check_changes
         run: |
-          git diff --exit-code Dockerfile server.json src/prometheus_mcp_server/server.py || echo "changes=true" >> $GITHUB_OUTPUT
+          git diff --exit-code Dockerfile server.json src/prometheus_mcp_server/server.py charts/prometheus-mcp-server/Chart.yaml || echo "changes=true" >> $GITHUB_OUTPUT
 
       - name: Commit and push changes
         if: steps.check_changes.outputs.changes == 'true'
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add Dockerfile server.json src/prometheus_mcp_server/server.py
+          git add Dockerfile server.json src/prometheus_mcp_server/server.py charts/prometheus-mcp-server/Chart.yaml
           git commit -m "chore: sync version to ${{ steps.get_version.outputs.version }}"
           git push
