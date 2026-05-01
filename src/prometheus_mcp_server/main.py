@@ -74,11 +74,17 @@ def run_server():
 
     http_transports = [TransportType.HTTP.value, TransportType.SSE.value]
     if transport in http_transports:
-        mcp.run(transport=transport, host=mcp_config.mcp_bind_host, port=mcp_config.mcp_bind_port)
-        logger.info("Starting Prometheus MCP Server", 
-                transport=transport, 
+        mcp.run(
+            transport=transport,
+            host=mcp_config.mcp_bind_host,
+            port=mcp_config.mcp_bind_port,
+            **({"stateless_http": True} if mcp_config.stateless_http else {})
+        )
+        logger.info("Starting Prometheus MCP Server",
+                transport=transport,
                 host=mcp_config.mcp_bind_host,
-                port=mcp_config.mcp_bind_port)
+                port=mcp_config.mcp_bind_port,
+                stateless_http=mcp_config.stateless_http)
     else:
         mcp.run(transport=transport)
         logger.info("Starting Prometheus MCP Server", transport=transport)

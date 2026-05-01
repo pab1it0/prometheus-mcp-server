@@ -37,6 +37,8 @@ mcp:
   transport: "http"
   # Bind host
   bindHost: "0.0.0.0"
+  # Enable stateless HTTP mode for multi-replica support
+  statelessHttp: false
   # Tool name prefix
   toolPrefix: ""
 
@@ -98,14 +100,14 @@ containerSecurityContext:
 
 livenessProbe:
   httpGet:
-    path: /
+    path: /health
     port: http
   initialDelaySeconds: 10
   periodSeconds: 30
 
 readinessProbe:
   httpGet:
-    path: /
+    path: /health
     port: http
   initialDelaySeconds: 5
   periodSeconds: 10

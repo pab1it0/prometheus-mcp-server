@@ -26,6 +26,13 @@ def _tool_name(name: str) -> str:
 mcp_name = f"Prometheus MCP ({TOOL_PREFIX})" if TOOL_PREFIX else "Prometheus MCP"
 mcp = FastMCP(mcp_name)
 
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_endpoint(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
 # Cache for metrics list to improve completion performance
 _metrics_cache = {"data": None, "timestamp": 0}
 _CACHE_TTL = 300  # 5 minutes
@@ -117,6 +124,7 @@ class MCPServerConfig:
     mcp_server_transport: TransportType = None
     mcp_bind_host: str = None
     mcp_bind_port: int = None
+    stateless_http: bool = False
 
     def __post_init__(self):
         """Validate mcp configuration."""
@@ -159,7 +167,8 @@ config = PrometheusConfig(
     mcp_server_config=MCPServerConfig(
         mcp_server_transport=os.environ.get("PROMETHEUS_MCP_SERVER_TRANSPORT", "stdio").lower(),
         mcp_bind_host=os.environ.get("PROMETHEUS_MCP_BIND_HOST", "127.0.0.1"),
-        mcp_bind_port=int(os.environ.get("PROMETHEUS_MCP_BIND_PORT", "8080"))
+        mcp_bind_port=int(os.environ.get("PROMETHEUS_MCP_BIND_PORT", "8080")),
+        stateless_http=os.environ.get("PROMETHEUS_MCP_STATELESS_HTTP", "False").lower() in ("true", "1", "yes"),
     ),
     client_cert=os.environ.get("PROMETHEUS_CLIENT_CERT", "") or None,
     client_key=os.environ.get("PROMETHEUS_CLIENT_KEY", "") or None,

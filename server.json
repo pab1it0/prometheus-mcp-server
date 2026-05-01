@@ -102,6 +102,13 @@
           "isSecret": false
         },
         {
+          "name": "PROMETHEUS_MCP_STATELESS_HTTP",
+          "description": "Enable stateless HTTP mode for multi-replica support (default: false)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
           "name": "PROMETHEUS_CUSTOM_HEADERS",
           "description": "Custom headers as JSON string to include in Prometheus requests",
           "isRequired": false,
