@@ -36,7 +36,7 @@ mcp:
   # Transport mode: http, sse, or stdio (use http or sse for Kubernetes)
   transport: "http"
   # Bind host
-  bindHost: "0.0.0.0"
+  bindHost: "::"
   # Enable stateless HTTP mode for multi-replica support
   statelessHttp: false
   # Tool name prefix
