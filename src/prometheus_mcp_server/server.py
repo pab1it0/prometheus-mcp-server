@@ -22,9 +22,45 @@ def _tool_name(name: str) -> str:
     """Build tool name with optional prefix."""
     return f"{TOOL_PREFIX}_{name}" if TOOL_PREFIX else name
 
+# Optional server-side tool allowlist. When PROMETHEUS_MCP_ENABLED_TOOLS is set
+# to a comma-separated list of tool base names (e.g.
+# "execute_query,list_metrics"), only those tools are registered. Names are
+# matched case-insensitively against the unprefixed tool name, so the allowlist
+# stays stable regardless of TOOL_PREFIX. When unset or empty, all tools are
+# registered (backward compatible). Useful as defense-in-depth for downstream
+# LLM agents and for narrowing the tool surface across multi-consumer
+# deployments.
+_enabled_tools_raw = os.environ.get("PROMETHEUS_MCP_ENABLED_TOOLS", "").strip()
+ENABLED_TOOLS: Optional[set] = (
+    {name.strip().lower() for name in _enabled_tools_raw.split(",") if name.strip()}
+    if _enabled_tools_raw
+    else None
+)
+
+def _tool_enabled(name: str) -> bool:
+    """Return True when the given (unprefixed) tool name should be registered."""
+    return ENABLED_TOOLS is None or name.lower() in ENABLED_TOOLS
+
 # Include prefix in MCP server name if set
 mcp_name = f"Prometheus MCP ({TOOL_PREFIX})" if TOOL_PREFIX else "Prometheus MCP"
 mcp = FastMCP(mcp_name)
+
+def _tool(*, name: str, **kwargs):
+    """Conditional ``mcp.tool`` decorator that honours PROMETHEUS_MCP_ENABLED_TOOLS.
+
+    The ``name`` argument is the (already-prefixed) tool name produced by
+    ``_tool_name(...)``. We strip the prefix back off before checking the
+    allowlist so the env var is always specified using the canonical base
+    names regardless of TOOL_PREFIX. When the tool is disabled we return a
+    no-op decorator so the underlying coroutine is left undefined for the MCP
+    server, effectively removing it from the surface.
+    """
+    base_name = name[len(TOOL_PREFIX) + 1:] if TOOL_PREFIX and name.startswith(f"{TOOL_PREFIX}_") else name
+    if _tool_enabled(base_name):
+        return mcp.tool(name=name, **kwargs)
+    def _skip(func):
+        return func
+    return _skip
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -46,7 +82,7 @@ def clear_metrics_cache():
 logger = get_logger()
 
 # Health check tool for Docker containers and monitoring
-@mcp.tool(
+@_tool(
     name=_tool_name("health_check"),
     description="Health check endpoint for container monitoring and status verification",
     annotations={
@@ -275,7 +311,7 @@ def get_cached_metrics() -> List[str]:
 # Note: Argument completions will be added when FastMCP supports the completion
 # capability. The get_cached_metrics() function above is ready for that integration.
 
-@mcp.tool(
+@_tool(
     name=_tool_name("execute_query"),
     description="Execute a PromQL instant query against Prometheus",
     annotations={
@@ -328,7 +364,7 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
 
     return result
 
-@mcp.tool(
+@_tool(
     name=_tool_name("execute_range_query"),
     description="Execute a PromQL range query with start time, end time, and step interval",
     annotations={
@@ -402,7 +438,7 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx: 
 
     return result
 
-@mcp.tool(
+@_tool(
     name=_tool_name("list_metrics"),
     description="List all available metrics in Prometheus with optional pagination support",
     annotations={
@@ -543,7 +579,7 @@ def _metadata_matches_pattern(metric_name: str, entries: List[Dict[str, Any]], p
     return False
 
 
-@mcp.tool(
+@_tool(
     name=_tool_name("get_metric_metadata"),
     description=(
         "Get metadata (type, help, unit) for metrics. "
@@ -627,7 +663,7 @@ async def get_metric_metadata(
 
     return result
 
-@mcp.tool(
+@_tool(
     name=_tool_name("get_targets"),
     description="Get information about all scrape targets",
     annotations={

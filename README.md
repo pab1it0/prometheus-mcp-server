@@ -177,6 +177,7 @@ See the [chart values](charts/prometheus-mcp-server/values.yaml) for all availab
 | `PROMETHEUS_MCP_STATELESS_HTTP` | Enable stateless HTTP mode for multi-replica support | No (default: False) |
 | `PROMETHEUS_CUSTOM_HEADERS` | Custom headers as JSON string | No |
 | `TOOL_PREFIX` | Prefix for all tool names (e.g., `staging` results in `staging_execute_query`). Useful for running multiple instances targeting different environments in Cursor | No |
+| `PROMETHEUS_MCP_ENABLED_TOOLS` | Comma-separated allowlist of tool base names to register (e.g. `execute_query,list_metrics`). Names are matched case-insensitively against the unprefixed tool name, so the allowlist is stable across `TOOL_PREFIX` values. When unset or empty, every tool is registered (default behaviour). Useful as defense-in-depth for downstream LLM agents and for narrowing the surface across multi-consumer deployments | No |
 
 ## Available Tools
 
@@ -190,6 +191,20 @@ See the [chart values](charts/prometheus-mcp-server/values.yaml) for all availab
 | `get_targets` | Discovery | Get information about all scrape targets |
 
 The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
+
+To enforce an allowlist server-side (so every connected client only sees the
+narrowed surface), set `PROMETHEUS_MCP_ENABLED_TOOLS` to a comma-separated
+list of base tool names. For example, the following limits the server to the
+four read-only tools used by a typical LLM investigation agent:
+
+```bash
+PROMETHEUS_MCP_ENABLED_TOOLS=execute_query,execute_range_query,list_metrics,get_metric_metadata
+```
+
+Tools omitted from this list are simply not registered, so they will not
+appear in `list_tools` responses and cannot be invoked. Leaving the variable
+unset (or empty) preserves the default behaviour where every tool is
+registered.
 
 ## Features
 
