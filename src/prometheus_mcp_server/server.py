@@ -659,6 +659,387 @@ async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
     
     return result
 
+@mcp.tool(
+    name=_tool_name("list_alerts"),
+    description="Get all active alerts from Prometheus with their state, labels, and annotations",
+    annotations={
+        "title": "List Active Alerts",
+        "icon": "🚨",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def list_alerts() -> Dict[str, Any]:
+    """Get all currently active alerts from Prometheus.
+
+    Returns:
+        Dictionary containing:
+        - alerts: List of active alerts with labels, annotations, state, and activeAt
+        - alert_count: Number of active alerts
+    """
+    logger.info("Retrieving active alerts")
+    data = make_prometheus_request("alerts", params=None)
+
+    alerts = data.get("alerts", [])
+    result = {
+        "alerts": alerts,
+        "alert_count": len(alerts)
+    }
+
+    logger.info("Active alerts retrieved", alert_count=len(alerts))
+    return result
+
+@mcp.tool(
+    name=_tool_name("list_rules"),
+    description="Get alerting and recording rules with their health, state, and evaluation info",
+    annotations={
+        "title": "List Alerting & Recording Rules",
+        "icon": "📜",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def list_rules(
+    type: Optional[str] = None,
+    rule_name: Optional[List[str]] = None,
+    rule_group: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Get alerting and recording rules currently loaded in Prometheus.
+
+    Args:
+        type: Optional rule type filter, either 'alert' or 'record'
+        rule_name: Optional list of rule names to filter by (forwarded to the server
+            on Prometheus >= 2.44 and re-applied client-side for older or
+            Prometheus-compatible backends that ignore the parameter)
+        rule_group: Optional list of rule group names to filter by (same fallback)
+
+    Returns:
+        Dictionary containing:
+        - groups: List of rule groups with their rules
+        - group_count: Number of rule groups returned
+    """
+    if type is not None and type not in ("alert", "record"):
+        raise ValueError(f"Invalid rule type: '{type}'. Must be 'alert' or 'record'.")
+
+    logger.info("Retrieving rules", type=type, rule_name=rule_name, rule_group=rule_group)
+
+    params: Dict[str, Any] = {}
+    if type:
+        params["type"] = type
+    if rule_name:
+        params["rule_name[]"] = rule_name
+    if rule_group:
+        params["rule_group[]"] = rule_group
+
+    data = make_prometheus_request("rules", params=params or None)
+
+    groups = data.get("groups", [])
+    # Prometheus < 2.44 and some compatible backends (Thanos, VictoriaMetrics) silently
+    # ignore rule_name[]/rule_group[], so re-apply the filters client-side. This is a
+    # no-op when the server already filtered.
+    if rule_group:
+        wanted_groups = set(rule_group)
+        groups = [g for g in groups if g.get("name") in wanted_groups]
+    if rule_name:
+        wanted_rules = set(rule_name)
+        groups = [
+            {**g, "rules": [r for r in g.get("rules", []) if r.get("name") in wanted_rules]}
+            for g in groups
+        ]
+        groups = [g for g in groups if g["rules"]]
+
+    result = {
+        "groups": groups,
+        "group_count": len(groups)
+    }
+
+    logger.info("Rules retrieved", group_count=len(groups))
+    return result
+
+@mcp.tool(
+    name=_tool_name("list_label_names"),
+    description="List all label names, optionally restricted to series matching selectors and a time range",
+    annotations={
+        "title": "List Label Names",
+        "icon": "🏷️",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def list_label_names(
+    match: Optional[List[str]] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+) -> Dict[str, Any]:
+    """List label names known to Prometheus.
+
+    Args:
+        match: Optional list of series selectors (e.g. ['up', 'node_cpu_seconds_total{job="node"}'])
+        start: Optional start time as RFC3339 or Unix timestamp
+        end: Optional end time as RFC3339 or Unix timestamp
+
+    Returns:
+        Dictionary containing:
+        - labels: List of label names
+        - count: Number of label names returned
+    """
+    logger.info("Listing label names", match=match, start=start, end=end)
+
+    params: Dict[str, Any] = {}
+    if match:
+        params["match[]"] = match
+    if start:
+        params["start"] = start
+    if end:
+        params["end"] = end
+
+    data = make_prometheus_request("labels", params=params or None)
+
+    result = {
+        "labels": data,
+        "count": len(data)
+    }
+
+    logger.info("Label names retrieved", count=len(data))
+    return result
+
+def _is_legacy_label_rune(ch: str, index: int) -> bool:
+    """Check whether a character is valid in a classic Prometheus label name."""
+    return (
+        ch == "_"
+        or "a" <= ch <= "z"
+        or "A" <= ch <= "Z"
+        or (index > 0 and "0" <= ch <= "9")
+    )
+
+
+def _escape_label_name(name: str) -> str:
+    """Escape a label name for use in a URL path using Prometheus 'values' escaping.
+
+    Names valid under the classic charset ([a-zA-Z_][a-zA-Z0-9_]*) pass through
+    unchanged. UTF-8 names (legal since Prometheus 3.x) are escaped to the U__ form
+    the API requires for path segments, since characters like '/' would otherwise
+    change the request path.
+    """
+    if all(_is_legacy_label_rune(ch, i) for i, ch in enumerate(name)):
+        return name
+
+    escaped = ["U__"]
+    for index, ch in enumerate(name):
+        if ch == "_":
+            escaped.append("__")
+        elif _is_legacy_label_rune(ch, index):
+            escaped.append(ch)
+        else:
+            escaped.append(f"_{ord(ch):x}_")
+    return "".join(escaped)
+
+
+@mcp.tool(
+    name=_tool_name("list_label_values"),
+    description="List all values for a label, optionally restricted to series matching selectors and a time range",
+    annotations={
+        "title": "List Label Values",
+        "icon": "🔤",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def list_label_values(
+    label_name: str,
+    match: Optional[List[str]] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+) -> Dict[str, Any]:
+    """List values for a specific label name.
+
+    Args:
+        label_name: The label name to retrieve values for (e.g. 'job', 'instance')
+        match: Optional list of series selectors to restrict the values
+        start: Optional start time as RFC3339 or Unix timestamp
+        end: Optional end time as RFC3339 or Unix timestamp
+
+    Returns:
+        Dictionary containing:
+        - values: List of values for the label
+        - count: Number of values returned
+    """
+    if not label_name:
+        raise ValueError("label_name must not be empty")
+
+    logger.info("Listing label values", label_name=label_name, match=match, start=start, end=end)
+
+    params: Dict[str, Any] = {}
+    if match:
+        params["match[]"] = match
+    if start:
+        params["start"] = start
+    if end:
+        params["end"] = end
+
+    data = make_prometheus_request(f"label/{_escape_label_name(label_name)}/values", params=params or None)
+
+    result = {
+        "values": data,
+        "count": len(data)
+    }
+
+    logger.info("Label values retrieved", label_name=label_name, count=len(data))
+    return result
+
+@mcp.tool(
+    name=_tool_name("find_series"),
+    description="Find time series matching label selectors, with optional time range and result limit",
+    annotations={
+        "title": "Find Series",
+        "icon": "🔍",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def find_series(
+    match: List[str],
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Find time series by label matchers.
+
+    Args:
+        match: List of series selectors; at least one is required
+            (e.g. ['up', 'process_start_time_seconds{job="prometheus"}'])
+        start: Optional start time as RFC3339 or Unix timestamp
+        end: Optional end time as RFC3339 or Unix timestamp
+        limit: Maximum number of series to return; must be positive (default: all)
+
+    Returns:
+        Dictionary containing:
+        - series: List of label sets identifying matching series
+        - returned_count: Number of series returned
+        - has_more: Whether more series matched than were returned
+    """
+    if not match:
+        raise ValueError("find_series requires at least one series selector in 'match'")
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be a positive number")
+
+    logger.info("Finding series", match=match, start=start, end=end, limit=limit)
+
+    params: Dict[str, Any] = {"match[]": match}
+    if start:
+        params["start"] = start
+    if end:
+        params["end"] = end
+    if limit is not None:
+        # Ask for one extra series so has_more can be derived from a bounded fetch.
+        # Servers older than 2.53 ignore the param; the slice below still applies.
+        params["limit"] = limit + 1
+
+    data = make_prometheus_request("series", params=params)
+
+    series = data[:limit] if limit is not None else data
+
+    result = {
+        "series": series,
+        "returned_count": len(series),
+        "has_more": len(series) < len(data)
+    }
+
+    logger.info("Series retrieved", returned_count=len(series), has_more=result["has_more"])
+    return result
+
+@mcp.tool(
+    name=_tool_name("get_runtime_info"),
+    description="Get Prometheus runtime information such as start time, config reload status, goroutine count, and storage retention",
+    annotations={
+        "title": "Get Runtime Info",
+        "icon": "⚙️",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def get_runtime_info() -> Dict[str, Any]:
+    """Get runtime information about the Prometheus server.
+
+    Returns:
+        Runtime properties including start time, working directory, config reload
+        status, goroutine count, and storage retention
+    """
+    logger.info("Retrieving runtime info")
+    data = make_prometheus_request("status/runtimeinfo")
+
+    logger.info("Runtime info retrieved")
+    return data
+
+@mcp.tool(
+    name=_tool_name("get_build_info"),
+    description="Get Prometheus build information such as version, revision, and Go version",
+    annotations={
+        "title": "Get Build Info",
+        "icon": "🏗️",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def get_build_info() -> Dict[str, Any]:
+    """Get build information about the Prometheus server.
+
+    Returns:
+        Build properties including version, revision, branch, and Go version
+    """
+    logger.info("Retrieving build info")
+    data = make_prometheus_request("status/buildinfo")
+
+    logger.info("Build info retrieved", version=data.get("version"))
+    return data
+
+@mcp.tool(
+    name=_tool_name("get_tsdb_stats"),
+    description="Get TSDB cardinality statistics: head series counts and top metrics by series count",
+    annotations={
+        "title": "Get TSDB Stats",
+        "icon": "💾",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def get_tsdb_stats(limit: Optional[int] = None) -> Dict[str, Any]:
+    """Get TSDB usage and cardinality statistics from Prometheus.
+
+    Args:
+        limit: Maximum number of items to return per stats list; must be positive (default: 10)
+
+    Returns:
+        TSDB statistics including head block stats and cardinality breakdowns
+        (series count by metric name, label pairs, and memory usage)
+    """
+    if limit is not None and limit < 1:
+        raise ValueError("limit must be a positive number")
+
+    logger.info("Retrieving TSDB stats", limit=limit)
+
+    params = {"limit": limit} if limit is not None else None
+    data = make_prometheus_request("status/tsdb", params=params)
+
+    logger.info("TSDB stats retrieved")
+    return data
+
 if __name__ == "__main__":
     logger.info("Starting Prometheus MCP Server", mode="direct")
     mcp.run()

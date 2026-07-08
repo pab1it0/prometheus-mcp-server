@@ -188,6 +188,14 @@ See the [chart values](charts/prometheus-mcp-server/values.yaml) for all availab
 | `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
 | `get_metric_metadata` | Discovery | Get metadata for one metric or bulk metadata with optional filtering |
 | `get_targets` | Discovery | Get information about all scrape targets |
+| `list_label_names` | Discovery | List all label names, optionally restricted to matching series and a time range |
+| `list_label_values` | Discovery | List all values for a label, optionally restricted to matching series and a time range |
+| `find_series` | Discovery | Find time series matching label selectors, with optional time range and result limit |
+| `list_alerts` | Alerting | Get all active alerts with their state, labels, and annotations |
+| `list_rules` | Alerting | Get alerting and recording rules with their health, state, and evaluation info |
+| `get_runtime_info` | Status | Get Prometheus runtime information (start time, config reload status, goroutine count, storage retention) |
+| `get_build_info` | Status | Get Prometheus build information (version, revision, Go version) |
+| `get_tsdb_stats` | Status | Get TSDB cardinality statistics (head series counts, top metrics by series count) |
 
 The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
 
