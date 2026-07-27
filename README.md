@@ -1,5 +1,7 @@
 # Prometheus MCP Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.pab1it0%2Fprometheus-mcp-server.svg)](https://mcptoplist.com/server/io.github.pab1it0%2Fprometheus-mcp-server)
+
 [![GitHub Container Registry](https://img.shields.io/badge/ghcr.io-pab1it0%2Fprometheus--mcp--server-blue?logo=docker)](https://github.com/users/pab1it0/packages/container/package/prometheus-mcp-server)
 [![Helm Chart](https://img.shields.io/badge/helm%20chart-ghcr.io-blue?logo=helm)](https://github.com/pab1it0/prometheus-mcp-server/pkgs/container/charts%2Fprometheus-mcp-server)
 [![GitHub Release](https://img.shields.io/github/v/release/pab1it0/prometheus-mcp-server)](https://github.com/pab1it0/prometheus-mcp-server/releases)
