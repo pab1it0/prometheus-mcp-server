@@ -629,7 +629,7 @@ async def get_metric_metadata(
 
 @mcp.tool(
     name=_tool_name("get_targets"),
-    description="Get information about all scrape targets",
+    description="Get scrape targets, with state/pool filtering and optional pagination",
     annotations={
         "title": "Get Scrape Targets",
         "icon": "🎯",
@@ -639,24 +639,88 @@ async def get_metric_metadata(
         "openWorldHint": True
     }
 )
-async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
-    """Get information about all Prometheus scrape targets.
+async def get_targets(
+    state: str = "active",
+    scrape_pool: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    """Get information about Prometheus scrape targets.
+
+    Args:
+        state: Which targets to request from Prometheus - "active" (default),
+            "dropped", or "any". This is applied server-side by Prometheus.
+        scrape_pool: Optional scrape pool name to restrict results to, applied
+            server-side by Prometheus.
+        limit: Maximum number of targets to return per category (default: all)
+        offset: Number of targets to skip for pagination (default: 0)
 
     Returns:
-        Dictionary with active and dropped targets information
+        Dictionary containing:
+        - activeTargets / droppedTargets: Target lists (after pagination)
+        - total_active / total_dropped: Totals before pagination
+        - returned_active / returned_dropped: Counts actually returned
+        - offset: Current offset
+        - has_more: Whether more targets are available
+        - state: The state filter that was applied
+
+    Note:
+        The default is "active" rather than "any" deliberately. On a cluster of
+        any size, service discovery finds far more targets than relabeling
+        keeps, and each dropped target carries its full discoveredLabels map.
+        Requesting dropped targets unfiltered can produce a response large
+        enough to exhaust the server's memory before any pagination could be
+        applied, since the whole payload is parsed first. Pass state="any" or
+        "dropped" explicitly when you need them, ideally with scrape_pool.
     """
-    logger.info("Retrieving scrape targets information")
-    data = make_prometheus_request("targets")
-    
+    valid_states = ("active", "dropped", "any")
+    if state not in valid_states:
+        raise ValueError(f"Invalid state '{state}'. Must be one of: {', '.join(valid_states)}")
+    if offset < 0:
+        raise ValueError("offset must be non-negative")
+    if limit is not None and limit < 0:
+        raise ValueError("limit must be non-negative")
+
+    logger.info("Retrieving scrape targets information",
+                state=state, scrape_pool=scrape_pool, limit=limit, offset=offset)
+
+    # Filter server-side so Prometheus never sends what we do not need.
+    params: Dict[str, str] = {}
+    if state != "any":
+        params["state"] = state
+    if scrape_pool:
+        params["scrapePool"] = scrape_pool
+
+    data = make_prometheus_request("targets", params=params or None)
+
+    active = data.get("activeTargets", []) or []
+    dropped = data.get("droppedTargets", []) or []
+    total_active, total_dropped = len(active), len(dropped)
+
+    if limit is not None:
+        end = offset + limit
+        active, dropped = active[offset:end], dropped[offset:end]
+    elif offset:
+        active, dropped = active[offset:], dropped[offset:]
+
     result = {
-        "activeTargets": data["activeTargets"],
-        "droppedTargets": data["droppedTargets"]
+        "activeTargets": active,
+        "droppedTargets": dropped,
+        "total_active": total_active,
+        "total_dropped": total_dropped,
+        "returned_active": len(active),
+        "returned_dropped": len(dropped),
+        "offset": offset,
+        "has_more": offset + len(active) < total_active or offset + len(dropped) < total_dropped,
+        "state": state,
     }
-    
-    logger.info("Scrape targets retrieved", 
-                active_targets=len(data["activeTargets"]), 
-                dropped_targets=len(data["droppedTargets"]))
-    
+
+    logger.info("Scrape targets retrieved",
+                active_targets=total_active,
+                dropped_targets=total_dropped,
+                returned_active=len(active),
+                returned_dropped=len(dropped))
+
     return result
 
 if __name__ == "__main__":

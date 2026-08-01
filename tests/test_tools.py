@@ -311,10 +311,118 @@ async def test_get_targets(mock_make_request):
         json_data = json.loads(payload)
 
         # Verify
-        mock_make_request.assert_called_once_with("targets")
+        # Defaults to active-only, filtered server-side by Prometheus.
+        mock_make_request.assert_called_once_with("targets", params={"state": "active"})
         assert len(json_data["activeTargets"]) == 1
         assert json_data["activeTargets"][0]["health"] == "up"
         assert len(json_data["droppedTargets"]) == 0
+        assert json_data["total_active"] == 1
+        assert json_data["total_dropped"] == 0
+        assert json_data["state"] == "active"
+        assert json_data["has_more"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "state,expected_params",
+    [
+        ("active", {"state": "active"}),
+        ("dropped", {"state": "dropped"}),
+        ("any", None),
+    ],
+)
+async def test_get_targets_state_filter(mock_make_request, state, expected_params):
+    """state is passed through to Prometheus; 'any' sends no filter."""
+    mock_make_request.return_value = {"activeTargets": [], "droppedTargets": []}
+
+    async with Client(mcp) as client:
+        await client.call_tool("get_targets", {"state": state})
+
+    mock_make_request.assert_called_once_with("targets", params=expected_params)
+
+
+@pytest.mark.asyncio
+async def test_get_targets_scrape_pool_filter(mock_make_request):
+    """scrape_pool is passed through to Prometheus alongside state."""
+    mock_make_request.return_value = {"activeTargets": [], "droppedTargets": []}
+
+    async with Client(mcp) as client:
+        await client.call_tool("get_targets", {"scrape_pool": "node_exporter"})
+
+    mock_make_request.assert_called_once_with(
+        "targets", params={"state": "active", "scrapePool": "node_exporter"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_targets_pagination(mock_make_request):
+    """limit/offset slice each category and report accurate totals."""
+    mock_make_request.return_value = {
+        "activeTargets": [{"labels": {"i": str(i)}} for i in range(5)],
+        "droppedTargets": [],
+    }
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "get_targets", {"state": "any", "limit": 2, "offset": 1}
+        )
+        json_data = json.loads(result.content[0].text)
+
+    assert [t["labels"]["i"] for t in json_data["activeTargets"]] == ["1", "2"]
+    assert json_data["total_active"] == 5
+    assert json_data["returned_active"] == 2
+    assert json_data["offset"] == 1
+    assert json_data["has_more"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_targets_offset_without_limit(mock_make_request):
+    """offset alone skips without truncating the remainder."""
+    mock_make_request.return_value = {
+        "activeTargets": [{"labels": {"i": str(i)}} for i in range(3)],
+        "droppedTargets": [],
+    }
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_targets", {"offset": 2})
+        json_data = json.loads(result.content[0].text)
+
+    assert json_data["returned_active"] == 1
+    assert json_data["total_active"] == 3
+    assert json_data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_targets_handles_missing_keys(mock_make_request):
+    """A response omitting either category should not raise."""
+    mock_make_request.return_value = {}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("get_targets", {})
+        json_data = json.loads(result.content[0].text)
+
+    assert json_data["activeTargets"] == []
+    assert json_data["total_dropped"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"state": "bogus"},
+        {"offset": -1},
+        {"limit": -5},
+    ],
+)
+async def test_get_targets_rejects_invalid_arguments(mock_make_request, kwargs):
+    """Invalid arguments fail before any request is made."""
+    from fastmcp.exceptions import ToolError
+
+    async with Client(mcp) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool("get_targets", kwargs)
+
+    mock_make_request.assert_not_called()
 
 
 # --- Helper function unit tests ---
