@@ -187,7 +187,7 @@ See the [chart values](charts/prometheus-mcp-server/values.yaml) for all availab
 | `execute_range_query` | Query | Execute a PromQL range query with start time, end time, and step interval |
 | `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
 | `get_metric_metadata` | Discovery | Get metadata for one metric or bulk metadata with optional filtering |
-| `get_targets` | Discovery | Get information about all scrape targets |
+| `get_targets` | Discovery | Get scrape targets, with server-side `state`/`scrape_pool` filtering and optional pagination |
 
 The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
 
