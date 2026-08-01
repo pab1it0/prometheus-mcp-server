@@ -114,6 +114,41 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_MCP_SPEC_2026",
+          "description": "Master switch for the MCP 2026-07-28 compatibility layer (default: true)",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_MCP_CACHE_TTL_MS",
+          "description": "Cache lifetime in milliseconds advertised as ttlMs on cacheable results (default: 300000)",
+          "isRequired": false,
+          "format": "number",
+          "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_MCP_CACHE_SCOPE",
+          "description": "Cache scope advertised on cacheable results: public or private (default: public)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_MCP_STRICT_HEADERS",
+          "description": "Reject an HTTP request whose Mcp-* headers contradict its JSON-RPC body, with HTTP 400 and code -32020 (default: false)",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false
+        },
+        {
+          "name": "PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE",
+          "description": "Allow a per-call org_id tool argument to override a configured ORG_ID. Leave off unless the deployment intends cross-tenant reads (default: false)",
+          "isRequired": false,
+          "format": "boolean",
+          "isSecret": false
         }
       ]
     }

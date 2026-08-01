@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 import sys
 import dotenv
-from prometheus_mcp_server.server import mcp, config, TransportType
+from prometheus_mcp_server.server import (
+    mcp,
+    config,
+    strict_header_asgi_middleware,
+    TransportType,
+)
 from prometheus_mcp_server.logging_config import setup_logging
 
 # Initialize structured logging
@@ -74,10 +79,15 @@ def run_server():
 
     http_transports = [TransportType.HTTP.value, TransportType.SSE.value]
     if transport in http_transports:
+        # Strict Mcp-* header validation is an ASGI concern: only there is the
+        # raw JSON-RPC body still available and the HTTP status still ours to
+        # choose. Returns None (and adds nothing) unless the operator opted in.
+        asgi_middleware = strict_header_asgi_middleware()
         mcp.run(
             transport=transport,
             host=mcp_config.mcp_bind_host,
             port=mcp_config.mcp_bind_port,
+            **({"middleware": [asgi_middleware]} if asgi_middleware else {}),
             **({"stateless_http": True} if mcp_config.stateless_http else {})
         )
         logger.info("Starting Prometheus MCP Server",

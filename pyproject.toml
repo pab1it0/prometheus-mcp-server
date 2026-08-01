@@ -27,8 +27,14 @@ dev = [
 prometheus-mcp-server = "prometheus_mcp_server.main:run_server"
 
 [tool.setuptools]
-packages = ["prometheus_mcp_server"]
 package-dir = {"" = "src"}
+
+# Discover subpackages automatically. An explicit `packages = [...]` list does not
+# include subpackages, which silently dropped prometheus_mcp_server.spec2026 from
+# built wheels even though server.py imports it at module load.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["prometheus_mcp_server*"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

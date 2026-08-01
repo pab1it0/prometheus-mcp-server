@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+import inspect
 import os
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Annotated, Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 import time
 from datetime import datetime, timedelta
@@ -11,7 +12,10 @@ from enum import Enum
 import dotenv
 import requests
 from fastmcp import FastMCP, Context
+from pydantic import Field
 from prometheus_mcp_server.logging_config import get_logger
+from prometheus_mcp_server.spec2026.headers import is_safe_plain_ascii
+from prometheus_mcp_server.spec2026.otel import get_trace_headers
 
 dotenv.load_dotenv()
 
@@ -155,6 +159,50 @@ class PrometheusConfig:
     custom_headers: Optional[Dict[str, str]] = None
     # Request timeout in seconds to prevent hanging requests (DDoS protection)
     request_timeout: int = 30
+    # MCP 2026-07-28 compatibility layer (see prometheus_mcp_server.spec2026)
+    spec_2026_enabled: bool = True
+    # Advertised cache lifetime in milliseconds for cacheable result envelopes.
+    # Deliberately separate from _CACHE_TTL, which governs the in-process
+    # metrics cache and is measured in seconds.
+    cache_ttl_ms: int = 300000
+    # Advertised cache scope for cacheable result envelopes: "public" or "private"
+    cache_scope: str = "public"
+    # Opt-in strict validation of the Mcp-* request headers against the body
+    strict_headers: bool = False
+    # Opt-in: let a per-call org_id override an operator-configured ORG_ID.
+    # Off by default because X-Scope-OrgID is the only tenancy boundary in
+    # Mimir/Cortex/Thanos, so honouring a client-supplied tenant when the
+    # operator has pinned one is a cross-tenant data-access hole.
+    allow_org_id_override: bool = False
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read an integer environment variable without ever failing at import.
+
+    A malformed value must not take the process down before any logging is
+    configured, so it is reported and the documented default is used instead.
+
+    Args:
+        name: Environment variable to read.
+        default: Value to fall back to when the variable is absent or unusable.
+
+    Returns:
+        The parsed integer, or ``default``.
+    """
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid integer environment variable, using default",
+            variable=name,
+            value=raw,
+            default=default,
+        )
+        return default
+
 
 config = PrometheusConfig(
     url=os.environ.get("PROMETHEUS_URL", ""),
@@ -174,6 +222,11 @@ config = PrometheusConfig(
     client_key=os.environ.get("PROMETHEUS_CLIENT_KEY", "") or None,
     custom_headers=json.loads(os.environ.get("PROMETHEUS_CUSTOM_HEADERS")) if os.environ.get("PROMETHEUS_CUSTOM_HEADERS") else None,
     request_timeout=int(os.environ.get("PROMETHEUS_REQUEST_TIMEOUT", "30")),
+    spec_2026_enabled=os.environ.get("PROMETHEUS_MCP_SPEC_2026", "True").lower() in ("true", "1", "yes"),
+    cache_ttl_ms=_env_int("PROMETHEUS_MCP_CACHE_TTL_MS", 300000),
+    cache_scope=os.environ.get("PROMETHEUS_MCP_CACHE_SCOPE", "public").lower(),
+    strict_headers=os.environ.get("PROMETHEUS_MCP_STRICT_HEADERS", "False").lower() in ("true", "1", "yes"),
+    allow_org_id_override=os.environ.get("PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE", "False").lower() in ("true", "1", "yes"),
 )
 
 def get_prometheus_auth():
@@ -184,8 +237,61 @@ def get_prometheus_auth():
         return requests.auth.HTTPBasicAuth(config.username, config.password)
     return None
 
-def make_prometheus_request(endpoint, params=None):
-    """Make a request to the Prometheus API with proper authentication and headers."""
+def resolve_org_id(org_id: Optional[str]) -> Optional[str]:
+    """Decide which tenant id, if any, belongs on the outbound request.
+
+    ``X-Scope-OrgID`` is the *only* tenancy boundary in Mimir/Cortex/Thanos, and
+    the caller here is typically an LLM acting on untrusted content, so a
+    client-supplied tenant must never silently displace one the operator pinned
+    via ``ORG_ID``. The precedence is therefore:
+
+    1. An operator-configured ``ORG_ID`` wins, unless the operator additionally
+       set ``PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE``.
+    2. With no ``ORG_ID`` configured, a per-call value is used as-is.
+    3. Either way the value must be safe plain ASCII, so a CR/LF or a non-ASCII
+       smuggling attempt never reaches an outbound header.
+
+    Args:
+        org_id: Tenant id supplied with this call, or None.
+
+    Returns:
+        The tenant id to send, or None when no ``X-Scope-OrgID`` should be set.
+    """
+    configured = config.org_id or None
+    if not org_id:
+        return configured
+
+    if not isinstance(org_id, str) or not is_safe_plain_ascii(org_id):
+        logger.warning(
+            "Rejecting unsafe per-call org_id; falling back to the configured tenant",
+            org_id_type=type(org_id).__name__,
+        )
+        return configured
+
+    if configured and not config.allow_org_id_override:
+        logger.warning(
+            "Ignoring per-call org_id because ORG_ID is configured",
+            switch="PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE",
+        )
+        return configured
+
+    logger.info("Using per-call tenant for this Prometheus request", org_id=org_id)
+    return org_id
+
+
+def make_prometheus_request(endpoint, params=None, org_id=None):
+    """Make a request to the Prometheus API with proper authentication and headers.
+
+    Args:
+        endpoint: Prometheus API endpoint below /api/v1/ (e.g. 'query', 'targets')
+        params: Optional query string parameters
+        org_id: Optional per-call tenant id. Only honoured when the operator
+            configured no ORG_ID, or explicitly opted into overrides via
+            PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE. See :func:`resolve_org_id`.
+
+    Returns:
+        The 'data' member of the Prometheus API response
+    """
     if not config.url:
         logger.error("Prometheus configuration missing", error="PROMETHEUS_URL not set")
         raise ValueError("Prometheus configuration is missing. Please set PROMETHEUS_URL environment variable.")
@@ -201,9 +307,18 @@ def make_prometheus_request(endpoint, params=None):
         headers.update(auth)
         auth = None  # Clear auth for requests.get if it's already in headers
     
-    # Add OrgID header if specified
-    if config.org_id:
-        headers["X-Scope-OrgID"] = config.org_id
+    # Add OrgID header if specified. An operator-configured ORG_ID always wins
+    # over a per-call value unless the operator opted into overrides.
+    effective_org_id = resolve_org_id(org_id)
+    if effective_org_id:
+        headers["X-Scope-OrgID"] = effective_org_id
+
+    # W3C trace context taken from the incoming request's _meta (2026-07-28
+    # minor change #2). Merged *before* custom_headers so operator-configured
+    # headers always win: a per-request value must never silently override
+    # static deployment configuration. Empty for clients that send no trace
+    # context, so this is a no-op on the 2025-11-25 path.
+    headers.update(get_trace_headers())
 
     if config.custom_headers:
         headers.update(config.custom_headers)
@@ -275,6 +390,52 @@ def get_cached_metrics() -> List[str]:
 # Note: Argument completions will be added when FastMCP supports the completion
 # capability. The get_cached_metrics() function above is ready for that integration.
 
+def _org_id_json_schema(schema: Dict[str, Any]) -> None:
+    """Attach the 2026-07-28 x-mcp-header annotation to the org_id property.
+
+    Pydantic renders Optional[str] as an anyOf union, but the specification only
+    permits the annotation on a primitive integer/string/boolean property, so
+    the union is collapsed to a plain string first. Pydantic's ``default: null``
+    is dropped along with it: a null default does not validate against the
+    declared ``string`` type, and a client that checks its own arguments against
+    the published inputSchema (or that materialises declared defaults into the
+    argument object) would reject a call the server happily accepts.
+
+    Args:
+        schema: The generated JSON Schema fragment for the property, edited in place.
+
+    Returns:
+        None
+    """
+    schema.pop("anyOf", None)
+    schema.pop("default", None)
+    schema["type"] = "string"
+    schema["x-mcp-header"] = "Org-Id"
+
+
+# Type of the optional multi-tenant override. An MCP 2026-07-28 client may mirror
+# the value in the Mcp-Param-Org-Id HTTP header; older clients simply pass it as a
+# normal argument. Only honoured when the operator configured no ORG_ID, or opted
+# into overrides -- see resolve_org_id.
+#
+# The parameter defaults to "" rather than None: FastMCP publishes the signature
+# default in the inputSchema *after* json_schema_extra has run, so a None default
+# would advertise `default: null` on a property this annotation forces to
+# `type: "string"`. A client that validates its arguments against the advertised
+# schema (or that materialises declared defaults) would then reject the very
+# value the schema told it to send. "" validates, and reads as "no tenant".
+OrgIdParam = Annotated[
+    Optional[str],
+    Field(
+        description=(
+            "Tenant id sent as X-Scope-OrgID. Ignored when the server has ORG_ID "
+            "configured, unless the operator enabled PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE"
+        ),
+        json_schema_extra=_org_id_json_schema,
+    ),
+]
+
+
 @mcp.tool(
     name=_tool_name("execute_query"),
     description="Execute a PromQL instant query against Prometheus",
@@ -287,12 +448,17 @@ def get_cached_metrics() -> List[str]:
         "openWorldHint": True
     }
 )
-async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any]:
+async def execute_query(query: str, time: Optional[str] = None, org_id: OrgIdParam = "") -> Dict[str, Any]:
     """Execute an instant query against Prometheus.
 
     Args:
         query: PromQL query string
         time: Optional RFC3339 or Unix timestamp (default: current time)
+        org_id: Optional tenant id sent as X-Scope-OrgID for this call only.
+            Ignored when the operator configured ORG_ID and did not enable
+            PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE. Annotated with
+            ``x-mcp-header: Org-Id`` so a 2026-07-28 client may also send it as
+            the ``Mcp-Param-Org-Id`` HTTP header.
 
     Returns:
         Query result with type (vector, matrix, scalar, string) and values
@@ -300,9 +466,13 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
     params = {"query": query}
     if time:
         params["time"] = time
-    
-    logger.info("Executing instant query", query=query, time=time)
-    data = make_prometheus_request("query", params=params)
+
+    logger.info("Executing instant query", query=query, time=time, org_id=org_id)
+
+    # Forward the tenant override only when one was supplied, so the single-tenant
+    # call is byte-for-byte what it has always been.
+    tenant_kwargs = {"org_id": org_id} if org_id else {}
+    data = make_prometheus_request("query", params=params, **tenant_kwargs)
 
     result = {
         "resultType": data["resultType"],
@@ -658,6 +828,325 @@ async def get_targets() -> Dict[str, List[Dict[str, Any]]]:
                 dropped_targets=len(data["droppedTargets"]))
     
     return result
+
+# ---------------------------------------------------------------------------
+# MCP 2026-07-28 compatibility layer
+#
+# The installed mcp SDK implements 2025-11-25, so every 2026-07-28 behaviour is
+# added here on top of it (see prometheus_mcp_server.spec2026). Everything below
+# is additive and switched off wholesale by PROMETHEUS_MCP_SPEC_2026=false.
+# ---------------------------------------------------------------------------
+
+#: Version advertised in the 2026-07-28 result envelope and discovery document.
+#: Kept in step with pyproject.toml and server.json by sync-version.yml.
+SERVER_VERSION = "1.6.1"
+
+from prometheus_mcp_server.spec2026.asgi import (
+    strict_header_middleware,
+    tool_annotation_lookup,
+)
+from prometheus_mcp_server.spec2026.discovery import install_discovery
+from prometheus_mcp_server.spec2026.envelope import (
+    _WRAPPER_MARKER as _ENVELOPE_WRAPPER_MARKER,
+    _get_request_handlers,
+    install_envelope,
+    install_initialize_envelope,
+)
+from prometheus_mcp_server.spec2026.negotiation import (
+    NegotiationError,
+    extract_request_meta,
+    negotiation_from_meta,
+    reset_current_negotiation,
+    set_current_negotiation,
+)
+from prometheus_mcp_server.spec2026.otel import (
+    extract_trace_headers,
+    reset_trace_headers,
+    set_trace_headers,
+)
+
+# The authoritative per-request ``_meta`` comes from the SDK's own request
+# context variable rather than from anything FastMCP rebuilt for itself.
+try:
+    from mcp.server.lowlevel.server import request_ctx as _sdk_request_ctx
+except Exception as e:  # pragma: no cover - requires an incompatible mcp SDK
+    logger.warning(
+        "MCP SDK request context unavailable; request _meta will not be read",
+        error=str(e),
+        error_type=type(e).__name__,
+    )
+    _sdk_request_ctx = None
+
+
+def _current_request_meta() -> Any:
+    """Read the raw ``_meta`` of the request currently being served.
+
+    Returns:
+        The SDK's ``RequestParams.Meta`` model, or None when no request is in
+        scope (the initialize handshake, or an internal FastMCP call such as a
+        tool-listing cache refresh).
+    """
+    if _sdk_request_ctx is None:
+        return None
+    try:
+        return getattr(_sdk_request_ctx.get(), "meta", None)
+    except LookupError:
+        return None
+    except Exception as e:
+        logger.warning(
+            "Could not read the SDK request context",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+        return None
+
+
+_NEGOTIATION_WRAPPER_MARKER = "_spec2026_negotiation_inner"
+
+#: Markers stamped on the low-level request handlers by this layer, innermost
+#: last. Used to unwrap a handler back to the SDK's own callable so a repeated
+#: install replaces rather than stacks.
+_SPEC_2026_WRAPPER_MARKERS = (_ENVELOPE_WRAPPER_MARKER, _NEGOTIATION_WRAPPER_MARKER)
+
+
+def _unwrap_spec_2026_handler(handler: Any) -> Any:
+    """Strip every 2026-07-28 wrapper off a low-level request handler.
+
+    Args:
+        handler: The handler currently registered for a request type.
+
+    Returns:
+        The innermost handler, i.e. the one the SDK or FastMCP registered.
+    """
+    while True:
+        for marker in _SPEC_2026_WRAPPER_MARKERS:
+            inner = getattr(handler, marker, None)
+            if inner is not None:
+                handler = inner
+                break
+        else:
+            return handler
+
+
+def _wrap_negotiation(handler: Any) -> Any:
+    """Build the per-request negotiation wrapper around a low-level handler.
+
+    Negotiation deliberately lives *below* FastMCP rather than in a FastMCP
+    middleware. FastMCP renders an exception raised during ``tools/call`` as a
+    successful ``CallToolResult`` with ``isError: true``, which would strip the
+    -32022 code and the ``data.supported`` list a client needs in order to
+    renegotiate. Raising from the low-level request handler produces a real
+    JSON-RPC error for every method alike.
+
+    Args:
+        handler: The original ``async (req) -> ServerResult`` handler.
+
+    Returns:
+        A coroutine function stamped with the negotiation wrapper marker.
+    """
+
+    async def negotiation_handler(req: Any = None) -> Any:
+        """Negotiate the request, publish its state, then run the handler."""
+        meta = extract_request_meta({"_meta": _current_request_meta()})
+
+        try:
+            negotiation = negotiation_from_meta(meta)
+        except NegotiationError as e:
+            logger.warning(
+                "Rejecting request after failed protocol negotiation",
+                code=e.code,
+                error=e.message,
+            )
+            raise e.to_mcp_error() from e
+
+        negotiation_token = set_current_negotiation(negotiation)
+        trace_token = set_trace_headers(extract_trace_headers(meta))
+        try:
+            result = handler(req)
+            if inspect.isawaitable(result):
+                result = await result
+            return result
+        finally:
+            # Capabilities are per-request and MUST NOT leak into the next one.
+            reset_current_negotiation(negotiation_token)
+            reset_trace_headers(trace_token)
+
+    setattr(negotiation_handler, _NEGOTIATION_WRAPPER_MARKER, handler)
+    return negotiation_handler
+
+
+def install_negotiation(server: Any = None) -> bool:
+    """Wrap a FastMCP server's request handlers with per-request negotiation.
+
+    Under 2026-07-28 a client restates its protocol version, capabilities and
+    trace context on every request inside ``params._meta`` rather than once at
+    initialize time. Each wrapped handler parses that block, rejects a protocol
+    version the server does not speak, and publishes the result on context
+    variables that downstream code (notably ``make_prometheus_request``) reads
+    without any threading of parameters. Both variables are reset in a
+    ``finally`` block so nothing survives into the next request.
+
+    Idempotent: an already-wrapped handler is unwrapped and re-wrapped rather
+    than nested, so repeated calls never stack duplicate negotiation passes.
+    Unwrapping strips the result envelope too, so this must run *before*
+    ``install_envelope`` -- which is the order ``install_spec_2026`` uses, and
+    which also puts negotiation innermost where the SDK's own request context is
+    still in scope.
+
+    Fully defensive: any unexpected SDK shape is logged and the server is left
+    exactly as it was. This function never raises.
+
+    Args:
+        server: The FastMCP server instance. Defaults to this module's server.
+
+    Returns:
+        True if at least one handler was wrapped, False if the layer degraded.
+    """
+    try:
+        handlers = _get_request_handlers(server if server is not None else mcp)
+        if handlers is None:
+            return False
+
+        wrapped_count = 0
+        for request_type in list(handlers.keys()):
+            inner = _unwrap_spec_2026_handler(handlers[request_type])
+            if not callable(inner):
+                logger.warning(
+                    "Skipping non-callable request handler",
+                    request_type=getattr(request_type, "__name__", repr(request_type)),
+                )
+                continue
+            handlers[request_type] = _wrap_negotiation(inner)
+            wrapped_count += 1
+
+        if wrapped_count == 0:
+            logger.warning("Negotiation wrapped no request handlers; layer inactive")
+            return False
+
+        logger.info("MCP 2026-07-28 negotiation installed", handler_count=wrapped_count)
+        return True
+
+    except Exception as e:
+        logger.warning(
+            "Per-request negotiation unavailable; server continues on 2025-11-25",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+        return False
+
+
+async def tool_header_annotations(tool_name: Any) -> List[Any]:
+    """Collect the ``x-mcp-header`` annotations declared by a tool's input schema.
+
+    Args:
+        tool_name: Name of the tool being called.
+
+    Returns:
+        The tool's validated header annotations, empty when the tool cannot be
+        resolved or declares none.
+    """
+    if not isinstance(tool_name, str):
+        return []
+    return await tool_annotation_lookup(mcp, tool_name)
+
+
+def strict_header_asgi_middleware() -> Any:
+    """Build the ASGI middleware enforcing the ``Mcp-*`` header rules (F6).
+
+    Strict validation happens at the ASGI layer because that is the only place
+    that still sees the exact JSON-RPC body the client sent -- FastMCP re-enters
+    its own middleware chain with internal sub-requests, and the SDK normalises
+    a ``params.uri`` before any FastMCP hook runs -- and the only place that can
+    still choose the HTTP status the design requires (400).
+
+    Returns:
+        A Starlette ``Middleware`` entry for ``FastMCP.run(middleware=[...])``,
+        or None when strict validation is switched off or unavailable.
+    """
+    if not config.strict_headers:
+        return None
+    try:
+        return strict_header_middleware(annotation_lookup=tool_header_annotations)
+    except Exception as e:
+        logger.warning(
+            "Strict header validation unavailable; requests will not be checked",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+        return None
+
+
+def install_spec_2026() -> Dict[str, Any]:
+    """Install the MCP 2026-07-28 compatibility layer onto this module's server.
+
+    Each piece is installed independently and every failure mode degrades to a
+    logged warning, so a future SDK release can disable the layer but can never
+    stop the server from serving 2025-11-25 clients. Every installer is
+    idempotent, so calling this twice (as the test-suite does) neither stacks
+    wrappers nor registers anything twice.
+
+    Returns:
+        Mapping of layer name to whether that piece was installed.
+    """
+    status: Dict[str, Any] = {
+        "negotiation": False,
+        "discovery": {},
+        "envelope": False,
+        "initialize_envelope": False,
+    }
+
+    try:
+        # Discovery first, so the negotiation and envelope wrappers installed
+        # below also cover the server/discover handler it registers.
+        status["discovery"] = install_discovery(
+            mcp,
+            mcp_name,
+            SERVER_VERSION,
+            tool_namer=_tool_name,
+            cache_scope=config.cache_scope,
+        )
+
+        status["negotiation"] = install_negotiation(mcp)
+
+        status["envelope"] = install_envelope(
+            mcp,
+            server_name=mcp_name,
+            server_version=SERVER_VERSION,
+            ttl_ms=config.cache_ttl_ms,
+            cache_scope=config.cache_scope,
+        )
+
+        # The SDK answers initialize inside ServerSession, out of reach of the
+        # request-handler wrappers, so it needs its own installer.
+        status["initialize_envelope"] = install_initialize_envelope(
+            server_name=mcp_name,
+            server_version=SERVER_VERSION,
+        )
+
+        logger.info(
+            "MCP 2026-07-28 compatibility layer installed",
+            strict_headers=config.strict_headers,
+            **status,
+        )
+    except Exception as e:
+        logger.warning(
+            "MCP 2026-07-28 compatibility layer unavailable; server continues on 2025-11-25",
+            error=str(e),
+            error_type=type(e).__name__,
+        )
+
+    return status
+
+
+if config.spec_2026_enabled:
+    SPEC_2026_STATUS = install_spec_2026()
+else:
+    SPEC_2026_STATUS = {}
+    logger.info(
+        "MCP 2026-07-28 compatibility layer disabled",
+        switch="PROMETHEUS_MCP_SPEC_2026",
+    )
+
 
 if __name__ == "__main__":
     logger.info("Starting Prometheus MCP Server", mode="direct")

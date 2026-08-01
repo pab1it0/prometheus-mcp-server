@@ -170,13 +170,18 @@ See the [chart values](charts/prometheus-mcp-server/values.yaml) for all availab
 | `PROMETHEUS_CLIENT_CERT` | Path to client certificate file for mutual TLS authentication | No |
 | `PROMETHEUS_CLIENT_KEY` | Path to client private key file for mutual TLS authentication | No |
 | `REQUESTS_CA_BUNDLE` | Path to CA bundle file for verifying the server's TLS certificate (standard `requests` library env var) | No |
-| `ORG_ID` | Organization ID for multi-tenant setups | No |
+| `ORG_ID` | Organization ID for multi-tenant setups, sent as `X-Scope-OrgID`. Always wins over a per-call `org_id` tool argument unless `PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE` is set | No |
 | `PROMETHEUS_MCP_SERVER_TRANSPORT` | Transport mode (stdio, http, sse) | No (default: stdio) |
 | `PROMETHEUS_MCP_BIND_HOST` | Host for HTTP transport | No (default: 127.0.0.1) |
 | `PROMETHEUS_MCP_BIND_PORT` | Port for HTTP transport | No (default: 8080) |
 | `PROMETHEUS_MCP_STATELESS_HTTP` | Enable stateless HTTP mode for multi-replica support | No (default: False) |
 | `PROMETHEUS_CUSTOM_HEADERS` | Custom headers as JSON string | No |
 | `TOOL_PREFIX` | Prefix for all tool names (e.g., `staging` results in `staging_execute_query`). Useful for running multiple instances targeting different environments in Cursor | No |
+| `PROMETHEUS_MCP_SPEC_2026` | Master switch for the MCP 2026-07-28 protocol layer | No (default: True) |
+| `PROMETHEUS_MCP_CACHE_TTL_MS` | Cache lifetime advertised as `ttlMs` on cacheable results | No (default: 300000) |
+| `PROMETHEUS_MCP_CACHE_SCOPE` | Cache scope advertised on cacheable results (`public` or `private`) | No (default: public) |
+| `PROMETHEUS_MCP_STRICT_HEADERS` | Reject an HTTP request whose `Mcp-*` headers contradict its JSON-RPC body (HTTP 400, code `-32020`) | No (default: False) |
+| `PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE` | Allow a per-call `org_id` tool argument to override a configured `ORG_ID` | No (default: False) |
 
 ## Available Tools
 
@@ -188,8 +193,49 @@ See the [chart values](charts/prometheus-mcp-server/values.yaml) for all availab
 | `list_metrics` | Discovery | List all available metrics in Prometheus with pagination and filtering support |
 | `get_metric_metadata` | Discovery | Get metadata for one metric or bulk metadata with optional filtering |
 | `get_targets` | Discovery | Get information about all scrape targets |
+| `server_discover` | System | Return the server's MCP 2026-07-28 discovery document |
 
 The list of tools is configurable, so you can choose which tools you want to make available to the MCP client. This is useful if you don't use certain functionality or if you don't want to take up too much of the context window.
+
+## MCP 2026-07-28 Support
+
+The server accepts `2026-07-28`, `2025-11-25` and `2025-06-18`. Support for the newest
+revision is a compatibility layer on top of the MCP SDK (which implements `2025-11-25`),
+so it is entirely additive — clients on older revisions see the server unchanged.
+
+- **`server/discover`** is reachable three ways: as a JSON-RPC method on every transport,
+  as `GET /server/discover` (the only pre-handshake route, alongside `/health`), and as the
+  `server_discover` tool.
+- **Result envelope** — every result carries `resultType` and
+  `_meta["io.modelcontextprotocol/serverInfo"]`. Cacheable results (`server/discover`,
+  `tools/list`, `prompts/list`, `resources/list`, `resources/templates/list`,
+  `resources/read`) also carry `ttlMs` and `cacheScope`; `tools/call` does not.
+- **Deterministic ordering** — `tools/list` returns tools sorted by name, so clients get
+  stable prompt-cache keys.
+- **Per-request negotiation** — `params._meta` may carry
+  `io.modelcontextprotocol/protocolVersion`, `clientCapabilities`, `clientInfo` and
+  `logLevel`. An unrecognised protocol version is rejected with JSON-RPC code `-32022`;
+  a request that declares none is treated as legacy and served normally.
+- **Trace context** — `traceparent`, `tracestate` and `baggage` in `params._meta` are
+  validated against W3C Trace Context and forwarded as headers on the outbound Prometheus
+  request. Malformed values are dropped, and `PROMETHEUS_CUSTOM_HEADERS` always takes
+  precedence over per-request values.
+- **`x-mcp-header`** — `execute_query` annotates its optional `org_id` parameter with
+  `x-mcp-header: Org-Id`, so the tenant may also be sent as the `Mcp-Param-Org-Id` header.
+  The value is sent to Prometheus as `X-Scope-OrgID`. **A configured `ORG_ID` always
+  wins**: `X-Scope-OrgID` is the only tenancy boundary in Mimir/Cortex/Thanos and the
+  caller is typically an LLM acting on untrusted content, so a client-supplied tenant is
+  only honoured when no `ORG_ID` is configured, or when the operator explicitly sets
+  `PROMETHEUS_MCP_ALLOW_ORG_ID_OVERRIDE=true`. Values that are not safe plain ASCII (CR,
+  LF, non-ASCII) are refused before they reach an outbound header.
+- **Strict header validation** — set `PROMETHEUS_MCP_STRICT_HEADERS=true` to reject an
+  HTTP request whose `Mcp-*` headers contradict its JSON-RPC body, with HTTP 400 and code
+  `-32020`. The `Mcp-*` headers are optional hints, so omitting one is never an error and
+  clients that send none are unaffected; only a header that actually disagrees with the
+  body is rejected. `MCP-Protocol-Version` is a transport header rather than a body
+  mirror and is only compared when the body declares a pre-2026 revision.
+
+Set `PROMETHEUS_MCP_SPEC_2026=false` to turn the whole layer off.
 
 ## Features
 
