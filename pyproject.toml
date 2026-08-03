@@ -5,7 +5,7 @@ description = "MCP server for Prometheus integration"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]>=1.26.0,<2",
+    "mcp[cli]>=1.26.0,<3",
     "prometheus-api-client",
     "python-dotenv",
     "requests",
