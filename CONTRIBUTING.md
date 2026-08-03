@@ -176,7 +176,7 @@ pytest -k "test_pattern"
 - **Test edge cases** - Consider error conditions and boundary cases
 - **Use meaningful test names** - Test names should describe what they're testing
 - **Keep tests isolated** - Tests should not depend on each other
-- **Mock external dependencies** - Use `pytest-mock` for mocking Prometheus API calls
+- **Mock external dependencies** - Use `unittest.mock` for mocking Prometheus API calls
 
 ### Test Structure
 

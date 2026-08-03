@@ -5,10 +5,9 @@ description = "MCP server for Prometheus integration"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp[cli]>=1.26.0,<2",
-    "prometheus-api-client",
     "python-dotenv",
     "requests",
+    "starlette",
     "structlog>=23.0.0",
     "fastmcp>=3.1.0",
 ]
@@ -18,7 +17,6 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-asyncio>=0.21.0",
-    "pytest-mock>=3.10.0",
     "docker>=7.0.0",
     "requests>=2.31.0",
 ]
