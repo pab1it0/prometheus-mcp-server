@@ -129,7 +129,7 @@ Deploy to Kubernetes using the Helm chart from the OCI registry:
 ```bash
 helm install prometheus-mcp-server \
   oci://ghcr.io/pab1it0/charts/prometheus-mcp-server \
-  --version 1.0.0 \
+  --version 1.1.1 \
   --set prometheus.url="http://prometheus:9090"
 ```
 
@@ -138,7 +138,7 @@ With authentication:
 ```bash
 helm install prometheus-mcp-server \
   oci://ghcr.io/pab1it0/charts/prometheus-mcp-server \
-  --version 1.0.0 \
+  --version 1.1.1 \
   --set prometheus.url="http://prometheus:9090" \
   --set auth.username="admin" \
   --set auth.password="secret"
@@ -149,7 +149,7 @@ With a custom values file:
 ```bash
 helm install prometheus-mcp-server \
   oci://ghcr.io/pab1it0/charts/prometheus-mcp-server \
-  --version 1.0.0 \
+  --version 1.1.1 \
   -f values.yaml
 ```
 
