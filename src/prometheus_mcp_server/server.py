@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import asyncio
 import os
 import json
 from typing import Any, Dict, List, Optional, Union
@@ -82,7 +83,7 @@ async def health_check() -> Dict[str, Any]:
         if config.url:
             try:
                 # Quick connectivity test
-                make_prometheus_request("query", params={"query": "up", "time": str(int(time.time()))})
+                await asyncio.to_thread(make_prometheus_request, "query", params={"query": "up", "time": str(int(time.time()))})
                 health_status["prometheus_connectivity"] = "healthy"
                 health_status["prometheus_url"] = config.url
             except Exception as e:
@@ -302,7 +303,7 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
         params["time"] = time
     
     logger.info("Executing instant query", query=query, time=time)
-    data = make_prometheus_request("query", params=params)
+    data = await asyncio.to_thread(make_prometheus_request, "query", params=params)
 
     result = {
         "resultType": data["resultType"],
@@ -365,7 +366,7 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx: 
     if ctx:
         await ctx.report_progress(progress=0, total=100, message="Initiating range query...")
 
-    data = make_prometheus_request("query_range", params=params)
+    data = await asyncio.to_thread(make_prometheus_request, "query_range", params=params)
 
     # Report progress
     if ctx:
@@ -446,7 +447,7 @@ async def list_metrics(
     if refresh_cache:
         clear_metrics_cache()
 
-    data = get_cached_metrics()
+    data = await asyncio.to_thread(get_cached_metrics)
 
     if ctx:
         await ctx.report_progress(progress=50, total=100, message=f"Processing {len(data)} metrics...")
@@ -580,7 +581,7 @@ async def get_metric_metadata(
     logger.info("Retrieving metric metadata", metric=metric, filter_pattern=filter_pattern, limit=limit, offset=offset)
 
     params = {"metric": metric} if metric else None
-    raw_data = make_prometheus_request("metadata", params=params)
+    raw_data = await asyncio.to_thread(make_prometheus_request, "metadata", params=params)
 
     metadata_by_metric = _normalize_metadata_map(raw_data)
 
@@ -691,7 +692,7 @@ async def get_targets(
     if scrape_pool:
         params["scrapePool"] = scrape_pool
 
-    data = make_prometheus_request("targets", params=params or None)
+    data = await asyncio.to_thread(make_prometheus_request, "targets", params=params or None)
 
     active = data.get("activeTargets", []) or []
     dropped = data.get("droppedTargets", []) or []
