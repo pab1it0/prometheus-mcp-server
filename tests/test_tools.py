@@ -1,5 +1,6 @@
 """Tests for the MCP tools functionality."""
 
+import asyncio
 import pytest
 import json
 import time
@@ -547,3 +548,29 @@ async def test_get_metric_metadata_fallback_entries(mock_make_request):
 
         assert len(json_data) == 1
         assert json_data[0]["type"] == "gauge"
+
+
+@pytest.mark.asyncio
+async def test_slow_prometheus_request_does_not_block_event_loop(mock_make_request):
+    """A slow upstream call must not freeze the event loop for other requests."""
+    def slow_request(endpoint, params=None):
+        time.sleep(0.5)
+        return {"resultType": "vector", "result": []}
+
+    mock_make_request.side_effect = slow_request
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.05)
+            ticks += 1
+
+    async with Client(mcp) as client:
+        task = asyncio.create_task(ticker())
+        try:
+            await client.call_tool("execute_query", {"query": "up"})
+        finally:
+            task.cancel()
+
+    assert ticks >= 5
