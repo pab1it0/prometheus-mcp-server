@@ -5,6 +5,7 @@ import pytest
 import json
 import time
 from unittest.mock import patch, MagicMock
+from urllib.parse import parse_qs, urlsplit
 from fastmcp import Client
 from prometheus_mcp_server.server import (
     mcp, execute_query, execute_range_query, list_metrics, get_metric_metadata, get_targets,
@@ -103,6 +104,54 @@ async def test_execute_range_query(mock_make_request):
         assert "links" in result.data
         assert len(result.data["links"]) > 0
         assert result.data["links"][0]["rel"] == "prometheus-ui"
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "start,end,step,window_ms,end_input,step_seconds",
+    [
+        ("1704067200", "1704067320", "1m", 120000,
+         "2024-01-01T00:02:00.000+00:00", "60"),
+        ("2024-01-01T00:00:00Z", "2024-01-01T00:02:00Z", "30s", 120000,
+         "2024-01-01T00:02:00.000+00:00", "30"),
+        ("2024-01-01T08:00:00+08:00", "2024-01-01T08:02:00+08:00", "1m30s", 120000,
+         "2024-01-01T00:02:00.000+00:00", "90"),
+        ("1704067200.125", "1704067320.625", "0.5", 120500,
+         "2024-01-01T00:02:00.625+00:00", "0.5"),
+    ],
+)
+async def test_range_query_link_preserves_window(
+    mock_make_request, start, end, step, window_ms, end_input, step_seconds
+):
+    """A UI link must reproduce the API's window, end time, and resolution."""
+    mock_make_request.return_value = {"resultType": "matrix", "result": []}
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "execute_range_query", {"query": "vector(1)", "start": start, "end": end, "step": step}
+        )
+
+    mock_make_request.assert_called_once_with(
+        "query_range", params={"query": "vector(1)", "start": start, "end": end, "step": step}
+    )
+    params = parse_qs(urlsplit(result.data["links"][0]["href"]).query)
+    assert params["g0.range_input"] == [f"{window_ms}ms"]
+    assert params["g0.end_input"] == [end_input]
+    assert params["g0.step_input"] == [step_seconds]
+    assert params["g0.res_type"] == ["custom"]
+    assert params["g0.res_step"] == [step_seconds]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("start,end", [("0", "0"), ("253402300680", "253402300800")])
+async def test_range_query_unrepresentable_ui_window_preserves_result(mock_make_request, start, end):
+    """Optional UI formatting must not fail a successful API query."""
+    data = {"resultType": "matrix", "result": []}
+    mock_make_request.return_value = data
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "execute_range_query", {"query": "vector(1)", "start": start, "end": end, "step": "1s"}
+        )
+    assert result.data == data
+
 
 @pytest.fixture
 def mock_get_cached_metrics():

@@ -200,6 +200,7 @@ The list of tools is configurable, so you can choose which tools you want to mak
   - Search metric metadata by name or description in a single call
   - View instant query results
   - View range query results with different step intervals
+  - Open range query results in the Prometheus UI with the same time window and resolution
 - Authentication support
   - Basic auth from environment variables
   - Bearer token auth from environment variables

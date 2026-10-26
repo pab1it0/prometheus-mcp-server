@@ -3,10 +3,11 @@
 import asyncio
 import os
 import json
+import re
 from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 import dotenv
@@ -329,6 +330,44 @@ async def execute_query(query: str, time: Optional[str] = None) -> Dict[str, Any
 
     return result
 
+def _range_query_ui_params(query: str, start: str, end: str, step: str) -> Optional[Dict[str, str]]:
+    """Translate API timestamps and durations to Prometheus UI parameters."""
+    def timestamp(value: str) -> float:
+        try:
+            return float(value)
+        except ValueError:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+    try:
+        end_seconds = timestamp(end)
+        window_ms = round((end_seconds - timestamp(start)) * 1000)
+        if window_ms <= 0:
+            return None
+        end_input = datetime.fromtimestamp(end_seconds, timezone.utc).isoformat(timespec="milliseconds")
+        try:
+            step_seconds = float(step)
+        except ValueError:
+            units = {"y": 31536000, "w": 604800, "d": 86400, "h": 3600,
+                     "m": 60, "s": 1, "ms": 0.001}
+            parts = re.findall(r"(\d+)(ms|[ywdhms])", step)
+            if not parts or "".join(number + unit for number, unit in parts) != step:
+                return None
+            step_seconds = sum(int(number) * units[unit] for number, unit in parts)
+        resolution = f"{step_seconds:.15g}"
+        return {
+            "g0.expr": query,
+            "g0.tab": "0",
+            "g0.range_input": f"{window_ms}ms",
+            "g0.end_input": end_input,
+            "g0.step_input": resolution,
+            "g0.res_type": "custom",
+            "g0.res_step": resolution,
+        }
+    except (ValueError, OverflowError, OSError):
+        # Link formatting must not turn a successful API query into an error.
+        return None
+
+
 @mcp.tool(
     name=_tool_name("execute_range_query"),
     description="Execute a PromQL range query with start time, end time, and step interval",
@@ -379,18 +418,14 @@ async def execute_range_query(query: str, start: str, end: str, step: str, ctx: 
 
     if not config.disable_prometheus_links:
         from urllib.parse import urlencode
-        ui_params = {
-            "g0.expr": query,
-            "g0.tab": "0",
-            "g0.range_input": f"{start} to {end}",
-            "g0.step_input": step
-        }
-        prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
-        result["links"] = [{
-            "href": prometheus_ui_link,
-            "rel": "prometheus-ui",
-            "title": "View in Prometheus UI"
-        }]
+        ui_params = _range_query_ui_params(query, start, end, step)
+        if ui_params is not None:
+            prometheus_ui_link = f"{config.url.rstrip('/')}/graph?{urlencode(ui_params)}"
+            result["links"] = [{
+                "href": prometheus_ui_link,
+                "rel": "prometheus-ui",
+                "title": "View in Prometheus UI"
+            }]
 
     # Report completion
     if ctx:
