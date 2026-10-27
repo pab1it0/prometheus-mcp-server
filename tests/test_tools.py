@@ -153,6 +153,32 @@ async def test_range_query_unrepresentable_ui_window_preserves_result(mock_make_
     assert result.data == data
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "step",
+    [
+        pytest.param("not-a-duration", id="unparseable"),
+        pytest.param("1m30", id="partially-matched-duration"),
+    ],
+)
+async def test_range_query_unrepresentable_ui_step_preserves_result(mock_make_request, step):
+    """An unrepresentable UI step must not discard a successful API result."""
+    data = {
+        "resultType": "matrix",
+        "result": [{"metric": {"__name__": "up"}, "values": [[1704067200, "1"]]}],
+    }
+    mock_make_request.return_value = data
+    params = {"query": "up", "start": "1704067200", "end": "1704067320", "step": step}
+
+    async with Client(mcp) as client:
+        result = await client.call_tool("execute_range_query", params)
+
+    mock_make_request.assert_called_once_with("query_range", params=params)
+    assert not result.is_error
+    assert result.data == data
+    assert "links" not in result.data
+
+
 @pytest.fixture
 def mock_get_cached_metrics():
     """Mock the get_cached_metrics function."""
