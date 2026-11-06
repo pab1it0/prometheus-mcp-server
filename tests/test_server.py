@@ -1,6 +1,7 @@
 """Tests for the Prometheus MCP server functionality."""
 
 import pytest
+import json
 import requests
 from unittest.mock import patch, MagicMock
 import asyncio
@@ -118,6 +119,43 @@ def test_make_prometheus_request_http_error(mock_get):
 
     # Execute and verify
     with pytest.raises(requests.HTTPError):
+        make_prometheus_request("query", {"query": "up"})
+
+def _error_response(status_code, body):
+    response = requests.Response()
+    response.status_code = status_code
+    response.reason = "Bad Request" if status_code == 400 else "Unprocessable Entity"
+    response.url = "http://test:9090/api/v1/query"
+    response._content = body.encode()
+    return response
+
+@pytest.mark.parametrize("status_code,error_type,error", [
+    (400, "bad_data", 'invalid parameter "query": 1:3: parse error: unexpected right parenthesis \')\''),
+    (422, "execution", "query processing would load too many samples into memory"),
+])
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_http_error_keeps_prometheus_message(mock_get, status_code, error_type, error):
+    """A 4xx answer from Prometheus surfaces the error from its body."""
+    mock_get.return_value = _error_response(
+        status_code, json.dumps({"status": "error", "errorType": error_type, "error": error})
+    )
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError) as exc_info:
+        make_prometheus_request("query", {"query": "up)"})
+
+    message = str(exc_info.value)
+    assert f"Prometheus API error ({status_code})" in message
+    assert f"{error_type}: {error}" in message
+    assert exc_info.value.response.status_code == status_code
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_http_error_without_prometheus_body(mock_get):
+    """A non-Prometheus error body still raises the plain HTTP error."""
+    mock_get.return_value = _error_response(400, "<html>bad gateway</html>")
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError, match="400 Client Error"):
         make_prometheus_request("query", {"query": "up"})
 
 @patch("prometheus_mcp_server.server.requests.get")
