@@ -186,6 +186,21 @@ def get_prometheus_auth():
         return requests.auth.HTTPBasicAuth(config.username, config.password)
     return None
 
+def _prometheus_error_message(response) -> Optional[str]:
+    """Return the error reported in a Prometheus API error body, if there is one.
+
+    Prometheus answers a bad query with a 4xx status and a JSON body such as
+    {"status": "error", "errorType": "bad_data", "error": "..."}.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict) or body.get("status") != "error" or not body.get("error"):
+        return None
+    error_type = body.get("errorType")
+    return f"{error_type}: {body['error']}" if error_type else str(body["error"])
+
 def make_prometheus_request(endpoint, params=None):
     """Make a request to the Prometheus API with proper authentication and headers."""
     if not config.url:
@@ -224,6 +239,14 @@ def make_prometheus_request(endpoint, params=None):
         # Make the request with appropriate headers, auth, and timeout (DDoS protection)
         response = requests.get(url, params=params, auth=auth, headers=headers, verify=url_ssl_verify, cert=client_cert, timeout=config.request_timeout)
 
+        if not response.ok:
+            error_msg = _prometheus_error_message(response)
+            if error_msg:
+                logger.error("Prometheus API returned error", endpoint=endpoint, status_code=response.status_code, error=error_msg)
+                raise requests.HTTPError(
+                    f"Prometheus API error ({response.status_code}): {error_msg}",
+                    response=response,
+                )
         response.raise_for_status()
         result = response.json()
         
