@@ -1,10 +1,11 @@
 """Tests for the Prometheus MCP server functionality."""
 
 import pytest
+import json
 import requests
 from unittest.mock import patch, MagicMock
 import asyncio
-from prometheus_mcp_server.server import make_prometheus_request, get_prometheus_auth, config
+from prometheus_mcp_server.server import make_prometheus_request, get_prometheus_auth, config, _prometheus_error_message
 
 @pytest.fixture
 def mock_response():
@@ -119,6 +120,99 @@ def test_make_prometheus_request_http_error(mock_get):
     # Execute and verify
     with pytest.raises(requests.HTTPError):
         make_prometheus_request("query", {"query": "up"})
+
+def _error_response(status_code, body):
+    response = requests.Response()
+    response.status_code = status_code
+    response.reason = "Bad Request" if status_code == 400 else "Unprocessable Entity"
+    response.url = "http://test:9090/api/v1/query"
+    response._content = body.encode()
+    return response
+
+@pytest.mark.parametrize("status_code,error_type,error", [
+    (400, "bad_data", 'invalid parameter "query": 1:3: parse error: unexpected right parenthesis \')\''),
+    (422, "execution", "query processing would load too many samples into memory"),
+])
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_http_error_keeps_prometheus_message(mock_get, status_code, error_type, error):
+    """A 4xx answer from Prometheus surfaces the error from its body."""
+    mock_get.return_value = _error_response(
+        status_code, json.dumps({"status": "error", "errorType": error_type, "error": error})
+    )
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError) as exc_info:
+        make_prometheus_request("query", {"query": "up)"})
+
+    message = str(exc_info.value)
+    assert f"Prometheus API error ({status_code})" in message
+    assert f"{error_type}: {error}" in message
+    assert exc_info.value.response.status_code == status_code
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_http_error_without_prometheus_body(mock_get):
+    """A non-Prometheus error body still raises the plain HTTP error."""
+    mock_get.return_value = _error_response(400, "<html>bad gateway</html>")
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError, match="400 Client Error"):
+        make_prometheus_request("query", {"query": "up"})
+
+@pytest.mark.parametrize("body", [
+    json.dumps(["error"]),
+    json.dumps({"status": "success", "data": {}}),
+    json.dumps({"status": "error", "errorType": "bad_data"}),
+    json.dumps({"status": "error", "errorType": "bad_data", "error": ""}),
+])
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_http_error_json_without_prometheus_error(mock_get, body):
+    """A JSON error body that is not a Prometheus error envelope still raises the plain HTTP error."""
+    mock_get.return_value = _error_response(400, body)
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError, match="400 Client Error") as exc_info:
+        make_prometheus_request("query", {"query": "up"})
+    assert "Prometheus API error" not in str(exc_info.value)
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_http_error_without_error_type(mock_get):
+    """The Prometheus message is kept when the body has no errorType."""
+    mock_get.return_value = _error_response(400, json.dumps({"status": "error", "error": "parse error"}))
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError) as exc_info:
+        make_prometheus_request("query", {"query": "up)"})
+    assert str(exc_info.value) == "Prometheus API error (400): parse error"
+
+@patch("prometheus_mcp_server.server.requests.get")
+def test_make_prometheus_request_server_error_keeps_prometheus_message(mock_get):
+    """A 5xx answer with a Prometheus error body, such as a query timeout, keeps the message too."""
+    response = _error_response(503, json.dumps({"status": "error", "errorType": "timeout", "error": "query timed out in expression evaluation"}))
+    response.reason = "Service Unavailable"
+    mock_get.return_value = response
+    config.url = "http://test:9090"
+
+    with pytest.raises(requests.HTTPError) as exc_info:
+        make_prometheus_request("query", {"query": "up"})
+    assert str(exc_info.value) == "Prometheus API error (503): timeout: query timed out in expression evaluation"
+    assert exc_info.value.response is response
+
+@pytest.mark.parametrize("body,expected", [
+    ('{"status": "error", "errorType": "bad_data", "error": "bad query"}', "bad_data: bad query"),
+    ('{"status": "error", "errorType": "", "error": "bad query"}', "bad query"),
+    ('{"status": "error", "error": "bad query"}', "bad query"),
+    ('{"status": "error", "error": 42}', "42"),
+    ('{"status": "error", "error": null}', None),
+    ('{"status": "success", "error": "bad query"}', None),
+    ('{"error": "bad query"}', None),
+    ('"error"', None),
+    ("null", None),
+    ("not json", None),
+    ("", None),
+])
+def test_prometheus_error_message(body, expected):
+    """Only a Prometheus error envelope with a non-empty error yields a message."""
+    assert _prometheus_error_message(_error_response(400, body)) == expected
 
 @patch("prometheus_mcp_server.server.requests.get")
 def test_make_prometheus_request_json_error(mock_get):
